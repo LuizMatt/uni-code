@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "unicode"
+version = "0.1.0"
+description = "LeetCode-style programming problems environment accessed via SSH"
+readme = "CLAUDE.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.14.0",
+    "fastapi>=0.115.0",
+    "jinja2>=3.1.4",
+    "psycopg[binary,pool]>=3.2.0",
+    "pydantic-settings>=2.6.0",
+    "pyyaml>=6.0.2",
+    "typer>=0.13.0",
+    "uvicorn[standard]>=0.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13.0",
+    "pytest>=8.3.0",
+    "pytest-json-report>=1.5.0",
+    "ruff>=0.8.0",
+    "types-PyYAML>=6.0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/unicode"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["unicode", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
