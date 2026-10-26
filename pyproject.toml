@@ -49,3 +49,4 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q"
+markers = ["db: requires the docker-compose Postgres (database unicode_test)"]

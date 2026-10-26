@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "postgresql://unicode_daemon:unicode_daemon@localhost:5432/unicode"
+    migrations_database_url: str = (
+        "postgresql://unicode_owner:unicode_owner@localhost:5432/unicode"
+    )
+    db_pool_min_size: int = 1
+    db_pool_max_size: int = 10
     questions_dir: Path = Path("questions")
     workspaces_dir: Path = Path("/srv/unicode/workspaces")
     daemon_socket_path: Path = Path("/run/unicode/daemon.sock")
