@@ -19,6 +19,9 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
 ]
 
+[project.scripts]
+unicode-admin = "unicode.cli_admin:app"
+
 [dependency-groups]
 dev = [
     "mypy>=1.13.0",
