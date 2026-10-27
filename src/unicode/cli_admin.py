@@ -3,8 +3,11 @@ from typing import Annotated
 
 import typer
 
+from unicode.config import get_settings
 from unicode.db import close_pool, transaction
+from unicode.models.question import SyncReport
 from unicode.models.student import ImportReport, Student
+from unicode.services.questions import scan_and_validate_questions_dir, sync_questions
 from unicode.services.students import (
     CsvFormatError,
     import_students,
@@ -137,6 +140,62 @@ def list_alunos_cmd(
         close_pool()
 
     typer.echo(format_student_list(students))
+
+
+def format_sync_report(target_dir: str, report: SyncReport) -> str:
+    """Format the question synchronization report in human-readable Portuguese."""
+    lines = [
+        f"Sincronização de {target_dir}",
+        f"  unidades criadas:     {report.units_created}",
+        f"  unidades atualizadas: {report.units_updated}",
+        f"  questões criadas:     {report.questions_created}",
+        f"  questões atualizadas: {report.questions_updated}",
+        f"  questões desativadas: {report.questions_deactivated}",
+    ]
+    if report.warnings:
+        lines.append("\nAvisos:")
+        for w in report.warnings:
+            lines.append(f"  {w.path}: {w.message}")
+
+    if report.errors:
+        lines.append("\nErros (sincronização não efetuada):")
+        for e in report.errors:
+            lines.append(f"  {e.path}: {e.message}")
+
+    return "\n".join(lines)
+
+
+@app.command("sync-questoes")
+def sync_questoes_cmd(
+    caminho_dir: Annotated[
+        Path | None,
+        typer.Option("--dir", "-d", help="Caminho do diretório de questões."),
+    ] = None,
+) -> None:
+    """Sincroniza as unidades e questões do disco com o banco de dados."""
+    target_dir = caminho_dir if caminho_dir is not None else get_settings().questions_dir
+
+    if not target_dir.exists() or not target_dir.is_dir():
+        typer.echo(f"Erro fatal: o diretório '{target_dir}' não existe.", err=True)
+        raise typer.Exit(code=2)
+
+    scanned = scan_and_validate_questions_dir(target_dir)
+
+    if scanned.has_errors:
+        report = SyncReport(issues=list(scanned.issues))
+        typer.echo(format_sync_report(str(target_dir), report))
+        raise typer.Exit(code=1)
+
+    try:
+        with transaction() as conn:
+            report = sync_questions(conn, scanned)
+    except Exception as exc:
+        typer.echo(f"Erro fatal de banco de dados: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    finally:
+        close_pool()
+
+    typer.echo(format_sync_report(str(target_dir), report))
 
 
 if __name__ == "__main__":
