@@ -39,6 +39,25 @@ MATRÍCULA  EMAIL               NOME            TURMA
 2 aluno(s)
 ```
 
+### `unicode-admin sync-questoes [--dir <caminho>]`
+
+Sincroniza as unidades e questões declaradas em arquivos no disco com o banco de dados PostgreSQL.
+
+- **Diretório padrão:** `questions/` (configurável via `--dir` ou variável `UNICODE_QUESTIONS_DIR`).
+- **Validação:** Valida a integridade das pastas de unidades (`unit.yaml`) e questões (`question.yaml`, `README.md`, `template.py`, `test_eval.py`). Em caso de erro de validação em qualquer item, **a sincronização inteira é cancelada** antes de tocar no banco.
+- **Upsert:** Insere ou atualiza unidades e questões no banco.
+- **Desativação lógica:** Questões removidas do disco são marcadas como `active = FALSE` (nunca sofrem `DELETE` físico) para preservar o histórico de tentativas e notas.
+- **Auditoria:** Registra o evento em `audit_log` sob ação `sync_questions`.
+- **Códigos de Saída:**
+  - `0`: Sincronização concluída com sucesso.
+  - `1`: Erros de validação na estrutura do diretório (nenhum dado alterado).
+  - `2`: Erro fatal (diretório inexistente ou falha de conexão com o banco).
+
+Para especificação completa da estrutura de arquivos e validações, veja [docs/architecture/question-catalog.md](question-catalog.md).
+
 ## Permissões de Banco de Dados
 
-A CLI conecta-se usando o papel `unicode_daemon` (`UNICODE_DATABASE_URL`), que possui privilégios de `SELECT`, `INSERT` e `UPDATE` na tabela `students` e `INSERT` em `audit_log`.
+A CLI conecta-se usando o papel `unicode_daemon` (`UNICODE_DATABASE_URL`), que possui privilégios de:
+- `SELECT`, `INSERT`, `UPDATE` nas tabelas `students`, `units` e `questions`.
+- `INSERT`, `SELECT` na tabela `audit_log`.
+
