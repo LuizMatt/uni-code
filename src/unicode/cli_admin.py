@@ -5,8 +5,15 @@ import typer
 
 from unicode.config import get_settings
 from unicode.db import close_pool, transaction
+from unicode.models.assignment import ResetResult
 from unicode.models.question import SyncReport
 from unicode.models.student import ImportReport, Student
+from unicode.services.assignments import (
+    AssignmentError,
+    archive_replaced_workspaces,
+    provision_workspace,
+    reset_assignments,
+)
 from unicode.services.questions import scan_and_validate_questions_dir, sync_questions
 from unicode.services.students import (
     CsvFormatError,
@@ -196,6 +203,72 @@ def sync_questoes_cmd(
         close_pool()
 
     typer.echo(format_sync_report(str(target_dir), report))
+
+
+def format_reset_report(result: ResetResult) -> str:
+    """Format the assignment reset report in human-readable Portuguese."""
+    replaced_str = ", ".join(a.question_slug for a in result.replaced_assignments)
+    new_str = ", ".join(a.question_slug for a in result.new_assignments)
+    lines = [
+        f"Reset de sorteio para {result.student_registration} ({result.unit_code}) "
+        f"- rodada {result.new_round}",
+        f"  substituídas: {replaced_str}",
+        f"  novas:        {new_str}",
+    ]
+    if result.reused_questions:
+        lines.append("\nAvisos:")
+        lines.append(
+            "  questões de rodadas anteriores foram reaproveitadas por falta de questões inéditas."
+        )
+    return "\n".join(lines)
+
+
+@app.command("reset")
+def reset_cmd(
+    matricula: Annotated[
+        str,
+        typer.Argument(help="Matrícula do aluno."),
+    ],
+    unidade: Annotated[
+        str,
+        typer.Option("--unidade", "-u", help="Código da unidade (ex.: unit-01)."),
+    ],
+    questao: Annotated[
+        str | None,
+        typer.Option("--questao", "-q", help="Slug de uma questão específica para resetar."),
+    ] = None,
+) -> None:
+    """Invalida o sorteio atual do aluno na unidade (ou questão) e sorteia novas questões."""
+    settings = get_settings()
+    try:
+        with transaction() as conn:
+            result = reset_assignments(
+                conn,
+                matricula,
+                unidade,
+                question_slug=questao,
+            )
+    except AssignmentError as exc:
+        typer.echo(f"Erro: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except Exception as exc:
+        typer.echo(f"Erro fatal de banco de dados: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    finally:
+        close_pool()
+
+    try:
+        archive_replaced_workspaces(settings.workspaces_dir, result.replaced_assignments)
+        provision_workspace(
+            settings.workspaces_dir,
+            settings.questions_dir,
+            result.new_assignments,
+        )
+    except Exception as exc:
+        typer.echo(f"Erro fatal ao atualizar workspace: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(format_reset_report(result))
 
 
 if __name__ == "__main__":
