@@ -1,3 +1,9 @@
+from unicode.models.assignment import (
+    Assignment,
+    AssignmentState,
+    DrawResult,
+    ResetResult,
+)
 from unicode.models.question import (
     QuestionDefinition,
     QuestionIssue,
@@ -14,10 +20,14 @@ from unicode.models.student import (
 )
 
 __all__ = [
+    "Assignment",
+    "AssignmentState",
+    "DrawResult",
     "ImportReport",
     "ParseResult",
     "QuestionDefinition",
     "QuestionIssue",
+    "ResetResult",
     "RowIssue",
     "ScanResult",
     "Student",
