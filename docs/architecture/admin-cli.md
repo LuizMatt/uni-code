@@ -55,9 +55,28 @@ Sincroniza as unidades e questões declaradas em arquivos no disco com o banco d
 
 Para especificação completa da estrutura de arquivos e validações, veja [docs/architecture/question-catalog.md](question-catalog.md).
 
+### `unicode-admin reset <matricula> --unidade <codigo> [--questao <slug>]`
+
+Invalida o sorteio atual do aluno na unidade (ou para uma questão específica) e sorteia novas questões, preservando histórico de tentativas anteriores e provisionando/arquivando pastas no workspace do aluno.
+
+- **Argumentos e opções:**
+  - `<matricula>` (obrigatório, posicional): Matrícula do aluno (preservando zeros à esquerda).
+  - `--unidade` / `-u <codigo>` (obrigatório): Código da unidade (ex.: `unit-01`).
+  - `--questao` / `-q <slug>` (opcional): Slug da questão individual a ser resetada. Se omitido, reseta todas as questões ativas da unidade para o aluno.
+- **Comportamento:**
+  - **Transação Atômica:** Executa dentro de transação com advisory lock PostgreSQL exclusivo por matrícula e unidade (`pg_advisory_xact_lock(hashtext(registration), unit_id)`), evitando condições de corrida com sorteios ou outros resets simultâneos.
+  - **Histórico Preservado:** O(s) sorteio(s) atual(is) são marcados como `replaced` com `points = 0` (nunca sofrem `DELETE` físico). As tentativas anteriores permanecem vinculadas ao sorteio antigo.
+  - **Nova Rodada:** Incrementa o número da rodada (`round = rodada_anterior + 1`).
+  - **Seleção Sem Repetição (com Fallback em 3 Tiers):** Seleciona aleatoriamente novas questões ativas da unidade priorizando: (1) questões nunca sorteadas para o aluno na unidade; (2) questões de rodadas anteriores já substituídas (excluindo as que estão sendo substituídas no reset atual); e (3) em último caso, as próprias questões recém-substituídas.
+  - **Workspace:** Arquiva os diretórios das questões substituídas em `_archive/round-<rodada>/<slug>/` dentro do workspace da unidade do aluno e provisiona os diretórios das novas questões com `README.md` e `solution.py` (a partir de `template.py`, sem expor `test_eval.py`).
+  - **Auditoria:** Registra o evento em `audit_log` sob ação `reset_assignments` com matrícula, unidade, `new_round`, slugs das questões substituídas (`replaced_questions`), novas (`new_questions`) e flag `reused_questions`.
+- **Códigos de Saída:**
+  - `0`: Reset concluído com sucesso.
+  - `1`: Erro de negócio (aluno não encontrado, unidade não encontrada, questão não encontrada no sorteio ativo, ou nenhuma questão disponível).
+  - `2`: Erro fatal de banco de dados ou erro fatal de filesystem ao provisionar workspace.
+
 ## Permissões de Banco de Dados
 
 A CLI conecta-se usando o papel `unicode_daemon` (`UNICODE_DATABASE_URL`), que possui privilégios de:
-- `SELECT`, `INSERT`, `UPDATE` nas tabelas `students`, `units` e `questions`.
+- `SELECT`, `INSERT`, `UPDATE` nas tabelas `students`, `units`, `questions` e `assignments`.
 - `INSERT`, `SELECT` na tabela `audit_log`.
-
