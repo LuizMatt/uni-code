@@ -56,3 +56,19 @@ def test_pool_sizes_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert settings.db_pool_min_size == 2
     assert settings.db_pool_max_size == 20
+
+
+def test_sandbox_settings_defaults_and_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = get_settings()
+    assert s.sandbox_image == "unicode-sandbox"
+    assert s.sandbox_timeout_seconds == 5
+    assert s.sandbox_memory_mb == 256
+    assert s.sandbox_cpus == 0.5
+    assert s.sandbox_pids_limit == 64
+
+    monkeypatch.setenv("UNICODE_SANDBOX_TIMEOUT_SECONDS", "10")
+    monkeypatch.setenv("UNICODE_SANDBOX_MEMORY_MB", "128")
+    s2 = get_settings()
+    assert s2.sandbox_timeout_seconds == 10
+    assert s2.sandbox_memory_mb == 128
+

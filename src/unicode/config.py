@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     workspaces_dir: Path = Path("/srv/unicode/workspaces")
     daemon_socket_path: Path = Path("/run/unicode/daemon.sock")
     admin_password: str = "change-me-in-prod"
+    sandbox_image: str = "unicode-sandbox"
+    sandbox_timeout_seconds: int = 5
+    sandbox_memory_mb: int = 256
+    sandbox_cpus: float = 0.5
+    sandbox_pids_limit: int = 64
 
 
 def get_settings() -> Settings:
