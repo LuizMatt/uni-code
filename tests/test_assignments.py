@@ -2,6 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import psycopg
@@ -10,6 +11,7 @@ from psycopg.rows import dict_row
 
 from tests.support import TEST_DAEMON_URL, TEST_OWNER_URL
 from unicode.db import DictConnection
+from unicode.models import Assignment
 from unicode.services.assignments import (
     InsufficientQuestionsError,
     NoActiveAssignmentsError,
@@ -104,6 +106,32 @@ class FakeAssignmentConn:
                 if a["student_registration"] == reg
                 and a["unit_id"] == uid
                 and a["state"] != "replaced"
+            ]
+            return FakeCursor(fetchall_val=rows)
+
+        if (
+            "FROM assignments a" in normalized
+            and "WHERE a.student_registration = %s AND a.state <> 'replaced'" in normalized
+            and "COUNT(att.id)" not in normalized
+        ):
+            reg = str(params[0])
+            q_by_id = {q["id"]: q for q in self.questions}
+            uid_to_code = {i: c for c, i in self.units.items()}
+            rows = [
+                {
+                    "id": a["id"],
+                    "student_registration": a["student_registration"],
+                    "unit_id": a["unit_id"],
+                    "unit_code": uid_to_code.get(a["unit_id"], "unit-01"),
+                    "question_id": a["question_id"],
+                    "question_slug": q_by_id[a["question_id"]]["slug"],
+                    "round": a["round"],
+                    "state": a["state"],
+                    "points": a["points"],
+                    "created_at": a["created_at"],
+                }
+                for a in sorted(self.assignments, key=lambda x: x["id"])
+                if a["student_registration"] == reg and a["state"] != "replaced"
             ]
             return FakeCursor(fetchall_val=rows)
 
@@ -307,6 +335,21 @@ def test_reset_without_active_assignments_raises_fake() -> None:
         reset_assignments(conn, "2026001", "unit-01")  # type: ignore[arg-type]
 
 
+def test_list_all_active_assignments_fake_unit() -> None:
+    from unicode.services.assignments import list_all_active_assignments
+
+    conn = FakeAssignmentConn()
+    assert list_all_active_assignments(conn, "2026001") == []  # type: ignore[arg-type]
+
+    draw = draw_assignments(conn, "2026001", "unit-01")  # type: ignore[arg-type]
+    active = list_all_active_assignments(conn, "2026001")  # type: ignore[arg-type]
+    assert len(active) == 2
+    assert [a.id for a in active] == [a.id for a in draw.assignments]
+
+    with pytest.raises(StudentNotFoundError):
+        list_all_active_assignments(conn, "unknown")  # type: ignore[arg-type]
+
+
 def _seed_unit_and_student(conn: DictConnection, num_questions: int = 5) -> None:
     conn.execute(
         "INSERT INTO students (registration, email, name) "
@@ -496,3 +539,55 @@ def test_get_student_status_and_resolve_unit_db(daemon_conn: DictConnection) -> 
     assert by_slug[slug_1].state == "pending"
     assert by_slug[slug_2].attempts_used == 0
     assert by_slug[slug_2].attempts_remaining == 3
+
+
+def test_ensure_student_workspace_creates_base_dir_and_preserves_edits(tmp_path: Path) -> None:
+    from unicode.services.assignments import ensure_student_workspace
+
+    ws_dir = tmp_path / "workspaces"
+    q_dir = tmp_path / "questions"
+
+    # Student with no active assignments still gets /srv/unicode/workspaces/<matricula>
+    student_dir = ensure_student_workspace(ws_dir, q_dir, "0020261", [])
+    assert student_dir == ws_dir / "0020261"
+    assert student_dir.is_dir()
+
+    # With active assignment, provisions README.md and solution.py without overwriting edits
+    q_folder = q_dir / "unit-01" / "q01-soma"
+    q_folder.mkdir(parents=True)
+    (q_folder / "README.md").write_text("# Enunciado", encoding="utf-8")
+    (q_folder / "template.py").write_text("def soma(a, b):\n    return 0\n", encoding="utf-8")
+
+    assignment = Assignment(
+        id=1,
+        student_registration="0020261",
+        unit_id=1,
+        unit_code="unit-01",
+        question_id=1,
+        question_slug="q01-soma",
+        round=1,
+        state="pending",
+        points=Decimal("0.0"),
+        created_at=datetime.now(UTC),
+    )
+    ensure_student_workspace(ws_dir, q_dir, "0020261", [assignment])
+    sol_file = student_dir / "unit-01" / "q01-soma" / "solution.py"
+    assert sol_file.exists()
+    sol_file.write_text("def soma(a, b):\n    return a + b\n", encoding="utf-8")
+
+    # Calling ensure_student_workspace again on re-login keeps student's edited solution.py
+    ensure_student_workspace(ws_dir, q_dir, "0020261", [assignment])
+    assert "return a + b" in sol_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.db
+def test_list_all_active_assignments_db(daemon_conn: DictConnection) -> None:
+    from unicode.services.assignments import list_all_active_assignments
+
+    _seed_unit_and_student(daemon_conn)
+    assert list_all_active_assignments(daemon_conn, "2026001") == []
+
+    draw = draw_assignments(daemon_conn, "2026001", "unit-01")
+    all_active = list_all_active_assignments(daemon_conn, "2026001")
+    assert len(all_active) == 2
+    assert [a.id for a in all_active] == [a.id for a in draw.assignments]

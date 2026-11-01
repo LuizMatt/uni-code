@@ -1,0 +1,12 @@
+# UniCode — Hardened OpenSSH configuration for shared student login (Etapa 8)
+# Install to: /etc/ssh/sshd_config.d/unicode-aluno.conf
+
+Match User aluno
+    ForceCommand /usr/local/bin/unicode-login
+    PermitTTY yes
+    AllowTcpForwarding no
+    X11Forwarding no
+    PermitTunnel no
+    AllowAgentForwarding no
+    GatewayPorts no
+    PermitUserRC no

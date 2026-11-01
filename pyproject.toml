@@ -23,6 +23,7 @@ dependencies = [
 unicode = "unicode.cli_student:app"
 unicode-admin = "unicode.cli_admin:app"
 unicode-daemon = "unicode.cli_daemon:app"
+unicode-login = "unicode.login:app"
 
 [dependency-groups]
 dev = [

@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -7,8 +8,11 @@ from unicode.db import DictConnection
 from unicode.models import IssuedSession, Session
 from unicode.services.assignments import StudentNotFoundError
 from unicode.services.sessions import (
+    InvalidCredentialsError,
+    LoginRateLimitError,
     SessionAuthError,
     authenticate_session,
+    authenticate_student_login,
     cleanup_expired_sessions,
     create_session,
     hash_session_token,
@@ -32,15 +36,37 @@ class FakeCursor:
 class FakeSessionConn:
     def __init__(self) -> None:
         self.students: set[str] = {"2026001"}
+        self.student_emails: dict[str, str] = {"2026001": "aluno@uni.edu"}
         self.sessions: dict[bytes, dict[str, Any]] = {}
         self.audit_logs: list[dict[str, Any]] = []
         self.now = datetime.now(UTC)
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> FakeCursor:
         norm = " ".join(sql.split())
+        if "pg_advisory_xact_lock" in norm:
+            return FakeCursor(fetchone_val={"pg_advisory_xact_lock": None})
+
+        if "FROM audit_log" in norm and "action = 'login_failed'" in norm:
+            norm_ip = str(params[1])
+            cnt = sum(
+                1
+                for log in self.audit_logs
+                if log.get("action") == "login_failed"
+                and json.loads(log["details"]).get("ip") == norm_ip
+            )
+            return FakeCursor(fetchone_val={"cnt": cnt})
+
+        if "SELECT registration, email FROM students WHERE registration = %s" in norm:
+            reg = str(params[0])
+            if reg in self.student_emails:
+                return FakeCursor(
+                    fetchone_val={"registration": reg, "email": self.student_emails[reg]}
+                )
+            return FakeCursor(fetchone_val=None)
+
         if "FROM students WHERE registration = %s" in norm:
             reg = str(params[0])
-            if reg in self.students:
+            if reg in self.students or reg in self.student_emails:
                 return FakeCursor(fetchone_val={"registration": reg})
             return FakeCursor(fetchone_val=None)
 
@@ -137,6 +163,84 @@ def test_create_session_rejects_unknown_student_and_invalid_ttl() -> None:
         create_session(conn, "2026001", ttl_seconds=0)  # type: ignore[arg-type]
 
 
+def test_authenticate_student_login_success_and_failures_unit() -> None:
+    conn = FakeSessionConn()
+
+    # Valid login (case-insensitive email, trimmed inputs)
+    issued = authenticate_student_login(
+        conn,  # type: ignore[arg-type]
+        "  ALUNO@uni.edu ",
+        " 2026001 ",
+        client_ip="10.0.0.1",
+        ttl_seconds=3600,
+    )
+    assert issued.session.student_registration == "2026001"
+    assert any(log["action"] == "login" for log in conn.audit_logs)
+
+    # Wrong email -> generic message + login_failed audit log
+    with pytest.raises(InvalidCredentialsError, match="^credenciais inválidas$"):
+        authenticate_student_login(
+            conn,  # type: ignore[arg-type]
+            "errado@uni.edu",
+            "2026001",
+            client_ip="10.0.0.2",
+        )
+
+    # Unknown registration -> same generic message + login_failed audit log
+    with pytest.raises(InvalidCredentialsError, match="^credenciais inválidas$"):
+        authenticate_student_login(
+            conn,  # type: ignore[arg-type]
+            "aluno@uni.edu",
+            "9999999",
+            client_ip="10.0.0.2",
+        )
+
+    # Empty inputs -> same generic message
+    with pytest.raises(InvalidCredentialsError, match="^credenciais inválidas$"):
+        authenticate_student_login(
+            conn,  # type: ignore[arg-type]
+            "   ",
+            "2026001",
+            client_ip="10.0.0.2",
+        )
+
+
+def test_authenticate_student_login_rate_limit_by_ip_unit() -> None:
+    conn = FakeSessionConn()
+    for _ in range(5):
+        with pytest.raises(InvalidCredentialsError):
+            authenticate_student_login(
+                conn,  # type: ignore[arg-type]
+                "wrong@uni.edu",
+                "2026001",
+                client_ip="192.168.1.50",
+                max_failures=5,
+                window_seconds=60,
+            )
+
+    # 6th attempt from same IP is blocked even with valid credentials
+    with pytest.raises(LoginRateLimitError, match="^credenciais inválidas$"):
+        authenticate_student_login(
+            conn,  # type: ignore[arg-type]
+            "aluno@uni.edu",
+            "2026001",
+            client_ip="192.168.1.50",
+            max_failures=5,
+            window_seconds=60,
+        )
+
+    # Another IP is unaffected
+    issued = authenticate_student_login(
+        conn,  # type: ignore[arg-type]
+        "aluno@uni.edu",
+        "2026001",
+        client_ip="192.168.1.51",
+        max_failures=5,
+        window_seconds=60,
+    )
+    assert issued.session.student_registration == "2026001"
+
+
 @pytest.mark.db
 def test_sessions_db_integration(daemon_conn: DictConnection) -> None:
     daemon_conn.execute(
@@ -156,3 +260,51 @@ def test_sessions_db_integration(daemon_conn: DictConnection) -> None:
     assert revoke_session(daemon_conn, issued.token) is True
     with pytest.raises(SessionAuthError):
         authenticate_session(daemon_conn, issued.token)
+
+
+@pytest.mark.db
+def test_authenticate_student_login_and_rate_limit_db(daemon_conn: DictConnection) -> None:
+    daemon_conn.execute(
+        "INSERT INTO students (registration, email, name) "
+        "VALUES ('0020261', 'Maria.Silva@instituicao.edu.br', 'Maria')"
+    )
+
+    # Successful login with leading zero registration and mixed-case email
+    issued = authenticate_student_login(
+        daemon_conn,
+        "  maria.silva@instituicao.edu.br ",
+        "0020261",
+        client_ip="203.0.113.10",
+        ttl_seconds=1800,
+    )
+    assert issued.session.student_registration == "0020261"
+
+    # 5 failed attempts from 203.0.113.99
+    for _ in range(5):
+        with pytest.raises(InvalidCredentialsError, match="^credenciais inválidas$"):
+            authenticate_student_login(
+                daemon_conn,
+                "invalido@instituicao.edu.br",
+                "0020261",
+                client_ip="203.0.113.99",
+                max_failures=5,
+                window_seconds=60,
+            )
+
+    # 6th attempt from 203.0.113.99 fails with LoginRateLimitError even with right credentials
+    with pytest.raises(LoginRateLimitError, match="^credenciais inválidas$"):
+        authenticate_student_login(
+            daemon_conn,
+            "maria.silva@instituicao.edu.br",
+            "0020261",
+            client_ip="203.0.113.99",
+            max_failures=5,
+            window_seconds=60,
+        )
+
+    rate_limited_row = daemon_conn.execute(
+        "SELECT COUNT(*) AS cnt FROM audit_log "
+        "WHERE action = 'login_rate_limited' AND details ->> 'ip' = '203.0.113.99'"
+    ).fetchone()
+    assert rate_limited_row is not None
+    assert int(rate_limited_row["cnt"]) == 1

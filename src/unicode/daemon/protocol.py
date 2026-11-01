@@ -15,8 +15,8 @@ _VALID_ACTIONS: set[str] = {"start", "status", "submit"}
 def parse_endpoint(endpoint: str | Path) -> tuple[str, str | tuple[str, int]]:
     """Parse an endpoint into ('tcp', (host, port)) or ('unix', path_str)."""
     raw = str(endpoint).strip()
-    if raw.startswith("tcp://"):
-        addr = raw[len("tcp://") :]
+    if raw.startswith("tcp:") or raw.startswith("tcp://"):
+        addr = raw[len("tcp:") :].lstrip("/\\")
         host, sep, port_str = addr.rpartition(":")
         if not sep or not host:
             raise ValueError(f"endpoint TCP inválido: {raw}")

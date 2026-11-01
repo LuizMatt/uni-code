@@ -83,3 +83,30 @@ def test_session_and_student_workspace_settings(monkeypatch: pytest.MonkeyPatch)
     s2 = get_settings()
     assert s2.session_ttl_seconds == 7200
     assert s2.student_workspace_dir == Path("/home/aluno")
+
+
+def test_login_and_student_shell_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = get_settings()
+    assert s.login_rate_limit_max_failures == 5
+    assert s.login_rate_limit_window_seconds == 60
+    assert s.student_shell_image == "unicode-aluno-shell"
+    assert s.student_shell_memory_mb == 512
+    assert s.student_shell_cpus == 1.0
+    assert s.student_shell_pids_limit == 128
+    assert s.student_shell_user == "1000:1000"
+
+    monkeypatch.setenv("UNICODE_LOGIN_RATE_LIMIT_MAX_FAILURES", "3")
+    monkeypatch.setenv("UNICODE_LOGIN_RATE_LIMIT_WINDOW_SECONDS", "120")
+    monkeypatch.setenv("UNICODE_STUDENT_SHELL_IMAGE", "custom-shell:latest")
+    monkeypatch.setenv("UNICODE_STUDENT_SHELL_MEMORY_MB", "256")
+    monkeypatch.setenv("UNICODE_STUDENT_SHELL_CPUS", "0.5")
+    monkeypatch.setenv("UNICODE_STUDENT_SHELL_PIDS_LIMIT", "64")
+    monkeypatch.setenv("UNICODE_STUDENT_SHELL_USER", "2000:2000")
+    s2 = get_settings()
+    assert s2.login_rate_limit_max_failures == 3
+    assert s2.login_rate_limit_window_seconds == 120
+    assert s2.student_shell_image == "custom-shell:latest"
+    assert s2.student_shell_memory_mb == 256
+    assert s2.student_shell_cpus == 0.5
+    assert s2.student_shell_pids_limit == 64
+    assert s2.student_shell_user == "2000:2000"
