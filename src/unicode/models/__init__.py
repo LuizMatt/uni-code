@@ -2,6 +2,7 @@ from unicode.models.assignment import (
     Assignment,
     AssignmentState,
     DrawResult,
+    QuestionStatus,
     ResetResult,
 )
 from unicode.models.attempt import (
@@ -20,6 +21,7 @@ from unicode.models.question import (
     UnitDefinition,
 )
 from unicode.models.sandbox import SandboxOutcome, SandboxResult
+from unicode.models.session import IssuedSession, Session
 from unicode.models.student import (
     ImportReport,
     ParseResult,
@@ -36,15 +38,18 @@ __all__ = [
     "DrawResult",
     "FeedbackStatus",
     "ImportReport",
+    "IssuedSession",
     "ParseResult",
     "QuestionDefinition",
     "QuestionIssue",
+    "QuestionStatus",
     "ReservedAttempt",
     "ResetResult",
     "RowIssue",
     "SandboxOutcome",
     "SandboxResult",
     "ScanResult",
+    "Session",
     "Student",
     "StudentFeedback",
     "StudentRow",
