@@ -1,0 +1,15 @@
+# Never include hidden question tests, student workspaces, or host secrets in Docker build context
+questions/
+workspaces/
+tests/
+docs/
+migrations/
+.git/
+.venv/
+.env
+.env.*
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
