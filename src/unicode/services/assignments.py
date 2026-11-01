@@ -469,3 +469,42 @@ def resolve_student_question_unit(
             f"do aluno '{registration}'"
         )
     return str(row["unit_code"])
+
+
+def list_all_active_assignments(
+    conn: DictConnection,
+    registration: str,
+) -> list[Assignment]:
+    """Return all active (non-replaced) assignments for a student across all units."""
+    student_row = conn.execute(
+        "SELECT registration FROM students WHERE registration = %s",
+        (registration,),
+    ).fetchone()
+    if student_row is None:
+        raise StudentNotFoundError(f"aluno '{registration}' não encontrado")
+
+    rows = conn.execute(
+        "SELECT a.id, a.student_registration, a.unit_id, u.code AS unit_code, "
+        "a.question_id, q.slug AS question_slug, a.round, a.state, a.points, a.created_at "
+        "FROM assignments a "
+        "JOIN questions q ON q.id = a.question_id "
+        "JOIN units u ON u.id = a.unit_id "
+        "WHERE a.student_registration = %s AND a.state <> 'replaced' "
+        "ORDER BY u.code, a.id",
+        (registration,),
+    ).fetchall()
+    return [_row_to_assignment(r) for r in rows]
+
+
+def ensure_student_workspace(
+    workspaces_dir: Path,
+    questions_dir: Path,
+    registration: str,
+    assignments: Sequence[Assignment],
+) -> Path:
+    """Ensure the student's root workspace directory and any active assignment files exist."""
+    student_dir = workspaces_dir / registration
+    student_dir.mkdir(parents=True, exist_ok=True)
+    if assignments:
+        provision_workspace(workspaces_dir, questions_dir, assignments)
+    return student_dir

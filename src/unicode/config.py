@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     student_workspace_dir: Path = Path(".")
     daemon_socket_path: Path = Path("/run/unicode/daemon.sock")
     session_ttl_seconds: int = 14400
+    login_rate_limit_max_failures: int = 5
+    login_rate_limit_window_seconds: int = 60
+    student_shell_image: str = "unicode-aluno-shell"
+    student_shell_memory_mb: int = 512
+    student_shell_cpus: float = 1.0
+    student_shell_pids_limit: int = 128
+    student_shell_user: str = "1000:1000"
     admin_password: str = "change-me-in-prod"
     sandbox_image: str = "unicode-sandbox"
     sandbox_timeout_seconds: int = 5
