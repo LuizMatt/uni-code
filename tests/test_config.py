@@ -72,3 +72,14 @@ def test_sandbox_settings_defaults_and_override(monkeypatch: pytest.MonkeyPatch)
     assert s2.sandbox_timeout_seconds == 10
     assert s2.sandbox_memory_mb == 128
 
+
+def test_session_and_student_workspace_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = get_settings()
+    assert s.session_ttl_seconds == 14400
+    assert s.student_workspace_dir == Path(".")
+
+    monkeypatch.setenv("UNICODE_SESSION_TTL_SECONDS", "7200")
+    monkeypatch.setenv("UNICODE_STUDENT_WORKSPACE_DIR", "/home/aluno")
+    s2 = get_settings()
+    assert s2.session_ttl_seconds == 7200
+    assert s2.student_workspace_dir == Path("/home/aluno")

@@ -44,10 +44,17 @@ class FakeAssignmentConn:
         self.students: set[str] = {"2026001"}
         self.units: dict[str, int] = {"unit-01": 1}
         self.questions: list[dict[str, Any]] = [
-            {"id": i, "unit_id": 1, "slug": f"q0{i}", "active": True}
+            {
+                "id": i,
+                "unit_id": 1,
+                "slug": f"q0{i}",
+                "title": f"Questão {i}",
+                "active": True,
+            }
             for i in range(1, 6)
         ]
         self.assignments: list[dict[str, Any]] = []
+        self.attempts: list[dict[str, Any]] = []
         self.audit_logs: list[dict[str, Any]] = []
         self.locks_acquired: list[tuple[str, int]] = []
         self._next_id = 1
@@ -167,6 +174,55 @@ class FakeAssignmentConn:
                 }
             )
             return FakeCursor()
+
+        if "COUNT(att.id) AS attempts_used" in normalized:
+            reg = str(params[0])
+            unit_filter = str(params[1]) if len(params) > 1 else None
+            q_by_id = {q["id"]: q for q in self.questions}
+            code_by_uid = {uid: c for c, uid in self.units.items()}
+            rows = []
+            for a in sorted(
+                self.assignments, key=lambda x: (code_by_uid[x["unit_id"]], x["id"])
+            ):
+                if a["student_registration"] != reg or a["state"] == "replaced":
+                    continue
+                u_code = code_by_uid[a["unit_id"]]
+                if unit_filter is not None and u_code != unit_filter:
+                    continue
+                q = q_by_id[a["question_id"]]
+                used = sum(
+                    1 for att in self.attempts if att["assignment_id"] == a["id"]
+                )
+                rows.append(
+                    {
+                        "unit_code": u_code,
+                        "question_slug": q["slug"],
+                        "question_title": q["title"],
+                        "round": a["round"],
+                        "state": a["state"],
+                        "points": a["points"],
+                        "attempts_used": used,
+                    }
+                )
+            return FakeCursor(fetchall_val=rows)
+
+        if (
+            "SELECT u.code AS unit_code FROM assignments a" in normalized
+            and "q.slug = %s" in normalized
+        ):
+            reg, slug = str(params[0]), str(params[1])
+            q_by_id = {q["id"]: q for q in self.questions}
+            code_by_uid = {uid: c for c, uid in self.units.items()}
+            for a in self.assignments:
+                if (
+                    a["student_registration"] == reg
+                    and a["state"] != "replaced"
+                    and q_by_id[a["question_id"]]["slug"] == slug
+                ):
+                    return FakeCursor(
+                        fetchone_val={"unit_code": code_by_uid[a["unit_id"]]}
+                    )
+            return FakeCursor(fetchone_val=None)
 
         raise AssertionError(f"Unexpected SQL in FakeAssignmentConn: {normalized}")
 
@@ -367,3 +423,76 @@ def test_db_concurrent_draw_advisory_lock(
             cleanup_conn.execute("DELETE FROM questions")
             cleanup_conn.execute("DELETE FROM units")
             cleanup_conn.execute("DELETE FROM students")
+
+
+def test_get_student_status_and_resolve_unit_fake() -> None:
+    from unicode.services.assignments import (
+        get_student_status,
+        resolve_student_question_unit,
+    )
+
+    conn = FakeAssignmentConn()
+    draw = draw_assignments(conn, "2026001", "unit-01")  # type: ignore[arg-type]
+    slug_1 = draw.assignments[0].question_slug
+    slug_2 = draw.assignments[1].question_slug
+
+    assert (
+        resolve_student_question_unit(conn, "2026001", slug_1)  # type: ignore[arg-type]
+        == "unit-01"
+    )
+    with pytest.raises(NoActiveAssignmentsError):
+        resolve_student_question_unit(conn, "2026001", "nonexistent-slug")  # type: ignore[arg-type]
+
+    with pytest.raises(StudentNotFoundError):
+        get_student_status(conn, "9999999")  # type: ignore[arg-type]
+
+    with pytest.raises(UnitNotFoundError):
+        get_student_status(conn, "2026001", unit_code="unit-99")  # type: ignore[arg-type]
+
+    conn.attempts.append({"id": 1, "assignment_id": draw.assignments[0].id})
+
+    statuses = get_student_status(conn, "2026001", unit_code="unit-01")  # type: ignore[arg-type]
+    assert len(statuses) == 2
+    by_slug = {s.question_slug: s for s in statuses}
+    assert by_slug[slug_1].attempts_used == 1
+    assert by_slug[slug_1].attempts_remaining == 2
+    assert by_slug[slug_1].state == "pending"
+    assert by_slug[slug_2].attempts_used == 0
+    assert by_slug[slug_2].attempts_remaining == 3
+
+    statuses_all = get_student_status(conn, "2026001")  # type: ignore[arg-type]
+    assert len(statuses_all) == 2
+
+
+@pytest.mark.db
+def test_get_student_status_and_resolve_unit_db(daemon_conn: DictConnection) -> None:
+    from unicode.services.assignments import (
+        get_student_status,
+        resolve_student_question_unit,
+    )
+
+    _seed_unit_and_student(daemon_conn)
+    draw = draw_assignments(daemon_conn, "2026001", "unit-01")
+    slug_1 = draw.assignments[0].question_slug
+    slug_2 = draw.assignments[1].question_slug
+
+    # Resolve unit from active question slug
+    assert resolve_student_question_unit(daemon_conn, "2026001", slug_1) == "unit-01"
+    with pytest.raises(NoActiveAssignmentsError):
+        resolve_student_question_unit(daemon_conn, "2026001", "nonexistent-slug")
+
+    # Record 1 failed attempt on first assignment
+    daemon_conn.execute(
+        "INSERT INTO attempts (assignment_id, number, status, tests_total, tests_passed, code) "
+        "VALUES (%s, 1, 'failed', 3, 1, 'x=1')",
+        (draw.assignments[0].id,),
+    )
+
+    statuses = get_student_status(daemon_conn, "2026001", unit_code="unit-01")
+    assert len(statuses) == 2
+    by_slug = {s.question_slug: s for s in statuses}
+    assert by_slug[slug_1].attempts_used == 1
+    assert by_slug[slug_1].attempts_remaining == 2
+    assert by_slug[slug_1].state == "pending"
+    assert by_slug[slug_2].attempts_used == 0
+    assert by_slug[slug_2].attempts_remaining == 3

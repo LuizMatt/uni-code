@@ -36,3 +36,15 @@ class ResetResult:
     replaced_assignments: list[Assignment] = field(default_factory=list)
     new_assignments: list[Assignment] = field(default_factory=list)
     reused_questions: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionStatus:
+    unit_code: str
+    question_slug: str
+    question_title: str
+    round: int
+    state: AssignmentState
+    points: Decimal
+    attempts_used: int
+    attempts_remaining: int

@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     db_pool_max_size: int = 10
     questions_dir: Path = Path("questions")
     workspaces_dir: Path = Path("/srv/unicode/workspaces")
+    student_workspace_dir: Path = Path(".")
     daemon_socket_path: Path = Path("/run/unicode/daemon.sock")
+    session_ttl_seconds: int = 14400
     admin_password: str = "change-me-in-prod"
     sandbox_image: str = "unicode-sandbox"
     sandbox_timeout_seconds: int = 5

@@ -12,10 +12,12 @@ from unicode.models.assignment import (
     Assignment,
     AssignmentState,
     DrawResult,
+    QuestionStatus,
     ResetResult,
 )
 
 _QUESTIONS_PER_UNIT = 2
+_MAX_ATTEMPTS_PER_ASSIGNMENT = 3
 _rng = secrets.SystemRandom()
 
 
@@ -375,3 +377,95 @@ def archive_replaced_workspaces(
 
     return archived
 
+
+def get_student_status(
+    conn: DictConnection,
+    registration: str,
+    *,
+    unit_code: str | None = None,
+) -> list[QuestionStatus]:
+    """Return active assignment status (including attempt counts) for a student."""
+    student_row = conn.execute(
+        "SELECT registration FROM students WHERE registration = %s",
+        (registration,),
+    ).fetchone()
+    if student_row is None:
+        raise StudentNotFoundError(f"aluno '{registration}' não encontrado")
+
+    if unit_code is not None:
+        unit_row = conn.execute(
+            "SELECT id FROM units WHERE code = %s",
+            (unit_code,),
+        ).fetchone()
+        if unit_row is None:
+            raise UnitNotFoundError(f"unidade '{unit_code}' não encontrada")
+        rows = conn.execute(
+            "SELECT u.code AS unit_code, q.slug AS question_slug, q.title AS question_title, "
+            "a.round, a.state, a.points, COUNT(att.id) AS attempts_used "
+            "FROM assignments a "
+            "JOIN units u ON u.id = a.unit_id "
+            "JOIN questions q ON q.id = a.question_id "
+            "LEFT JOIN attempts att ON att.assignment_id = a.id "
+            "WHERE a.student_registration = %s AND u.code = %s AND a.state <> 'replaced' "
+            "GROUP BY a.id, u.code, q.slug, q.title, a.round, a.state, a.points "
+            "ORDER BY u.code, a.id",
+            (registration, unit_code),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT u.code AS unit_code, q.slug AS question_slug, q.title AS question_title, "
+            "a.round, a.state, a.points, COUNT(att.id) AS attempts_used "
+            "FROM assignments a "
+            "JOIN units u ON u.id = a.unit_id "
+            "JOIN questions q ON q.id = a.question_id "
+            "LEFT JOIN attempts att ON att.assignment_id = a.id "
+            "WHERE a.student_registration = %s AND a.state <> 'replaced' "
+            "GROUP BY a.id, u.code, q.slug, q.title, a.round, a.state, a.points "
+            "ORDER BY u.code, a.id",
+            (registration,),
+        ).fetchall()
+
+    result: list[QuestionStatus] = []
+    for r in rows:
+        state = cast(AssignmentState, str(r["state"]))
+        used = int(r["attempts_used"])
+        remaining = (
+            0
+            if state in ("passed", "exhausted", "replaced")
+            else max(0, _MAX_ATTEMPTS_PER_ASSIGNMENT - used)
+        )
+        result.append(
+            QuestionStatus(
+                unit_code=str(r["unit_code"]),
+                question_slug=str(r["question_slug"]),
+                question_title=str(r["question_title"]),
+                round=int(r["round"]),
+                state=state,
+                points=Decimal(str(r["points"])),
+                attempts_used=used,
+                attempts_remaining=remaining,
+            )
+        )
+    return result
+
+
+def resolve_student_question_unit(
+    conn: DictConnection,
+    registration: str,
+    question_slug: str,
+) -> str:
+    """Resolve the active unit_code for a student's drawn question_slug."""
+    row = conn.execute(
+        "SELECT u.code AS unit_code "
+        "FROM assignments a "
+        "JOIN units u ON u.id = a.unit_id "
+        "JOIN questions q ON q.id = a.question_id "
+        "WHERE a.student_registration = %s AND q.slug = %s AND a.state <> 'replaced'",
+        (registration, question_slug),
+    ).fetchone()
+    if row is None:
+        raise NoActiveAssignmentsError(
+            f"questão '{question_slug}' não faz parte de nenhum sorteio ativo "
+            f"do aluno '{registration}'"
+        )
+    return str(row["unit_code"])

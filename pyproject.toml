@@ -20,7 +20,9 @@ dependencies = [
 ]
 
 [project.scripts]
+unicode = "unicode.cli_student:app"
 unicode-admin = "unicode.cli_admin:app"
+unicode-daemon = "unicode.cli_daemon:app"
 
 [dependency-groups]
 dev = [
