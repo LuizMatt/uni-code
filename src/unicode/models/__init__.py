@@ -13,6 +13,17 @@ from unicode.models.attempt import (
     StudentFeedback,
     SubmissionResult,
 )
+from unicode.models.grade import (
+    AssignmentHistoryItem,
+    AttemptDetail,
+    OverviewStats,
+    QuestionRateStat,
+    StudentDetailReport,
+    StudentGradesSummary,
+    StudentUnitGrade,
+    UnitDetailReport,
+    UnitSummary,
+)
 from unicode.models.question import (
     QuestionDefinition,
     QuestionIssue,
@@ -32,16 +43,20 @@ from unicode.models.student import (
 
 __all__ = [
     "Assignment",
+    "AssignmentHistoryItem",
     "AssignmentState",
     "Attempt",
+    "AttemptDetail",
     "AttemptStatus",
     "DrawResult",
     "FeedbackStatus",
     "ImportReport",
     "IssuedSession",
+    "OverviewStats",
     "ParseResult",
     "QuestionDefinition",
     "QuestionIssue",
+    "QuestionRateStat",
     "QuestionStatus",
     "ReservedAttempt",
     "ResetResult",
@@ -51,9 +66,14 @@ __all__ = [
     "ScanResult",
     "Session",
     "Student",
+    "StudentDetailReport",
     "StudentFeedback",
+    "StudentGradesSummary",
     "StudentRow",
+    "StudentUnitGrade",
     "SubmissionResult",
     "SyncReport",
     "UnitDefinition",
+    "UnitDetailReport",
+    "UnitSummary",
 ]

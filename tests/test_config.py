@@ -110,3 +110,17 @@ def test_login_and_student_shell_settings(monkeypatch: pytest.MonkeyPatch) -> No
     assert s2.student_shell_cpus == 0.5
     assert s2.student_shell_pids_limit == 64
     assert s2.student_shell_user == "2000:2000"
+
+
+def test_panel_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("UNICODE_PANEL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("UNICODE_ADMIN_EMAIL", raising=False)
+    monkeypatch.delenv("UNICODE_WEB_DIST_DIR", raising=False)
+    settings = Settings(_env_file=None)
+    assert (
+        settings.panel_database_url
+        == "postgresql://unicode_panel:unicode_panel@localhost:5432/unicode"
+    )
+    assert settings.admin_email == "admin@unicode.local"
+    assert settings.web_dist_dir == Path("web/dist")
+

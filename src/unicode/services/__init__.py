@@ -14,6 +14,15 @@ from unicode.services.assignments import (
     reset_assignments,
     resolve_student_question_unit,
 )
+from unicode.services.grades import (
+    GradeReportError,
+    format_grades_csv,
+    get_overview_stats,
+    get_student_detail_report,
+    get_unit_detail_report,
+    list_student_grades_summary,
+    list_unit_grades_for_export,
+)
 from unicode.services.questions import scan_and_validate_questions_dir, sync_questions
 from unicode.services.sessions import (
     InvalidCredentialsError,
@@ -56,6 +65,7 @@ __all__ = [
     "AttemptInProgressError",
     "CsvFormatError",
     "EmptySubmissionError",
+    "GradeReportError",
     "InsufficientQuestionsError",
     "InvalidCredentialsError",
     "LoginAuthError",
@@ -76,13 +86,19 @@ __all__ = [
     "draw_assignments",
     "ensure_student_workspace",
     "finalize_attempt",
+    "format_grades_csv",
+    "get_overview_stats",
+    "get_student_detail_report",
     "get_student_status",
+    "get_unit_detail_report",
     "hash_session_token",
     "import_students",
     "list_active_assignments",
     "list_all_active_assignments",
     "list_attempts",
+    "list_student_grades_summary",
     "list_students",
+    "list_unit_grades_for_export",
     "parse_students_csv",
     "provision_workspace",
     "recover_stale_attempts",

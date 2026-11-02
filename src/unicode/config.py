@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     migrations_database_url: str = (
         "postgresql://unicode_owner:unicode_owner@localhost:5432/unicode"
     )
+    panel_database_url: str = (
+        "postgresql://unicode_panel:unicode_panel@localhost:5432/unicode"
+    )
     db_pool_min_size: int = 1
     db_pool_max_size: int = 10
     questions_dir: Path = Path("questions")
@@ -31,7 +34,9 @@ class Settings(BaseSettings):
     student_shell_cpus: float = 1.0
     student_shell_pids_limit: int = 128
     student_shell_user: str = "1000:1000"
+    admin_email: str = "admin@unicode.local"
     admin_password: str = "change-me-in-prod"
+    web_dist_dir: Path = Path("web/dist")
     sandbox_image: str = "unicode-sandbox"
     sandbox_timeout_seconds: int = 5
     sandbox_memory_mb: int = 256
