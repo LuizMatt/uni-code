@@ -11,7 +11,6 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.14.0",
     "fastapi>=0.115.0",
-    "jinja2>=3.1.4",
     "psycopg[binary,pool]>=3.2.0",
     "pydantic-settings>=2.6.0",
     "pyyaml>=6.0.2",
@@ -24,6 +23,7 @@ unicode = "unicode.cli_student:app"
 unicode-admin = "unicode.cli_admin:app"
 unicode-daemon = "unicode.cli_daemon:app"
 unicode-login = "unicode.login:app"
+unicode-web = "unicode.cli_web:app"
 
 [dependency-groups]
 dev = [

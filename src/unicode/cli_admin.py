@@ -14,6 +14,11 @@ from unicode.services.assignments import (
     provision_workspace,
     reset_assignments,
 )
+from unicode.services.grades import (
+    GradeReportError,
+    format_grades_csv,
+    list_unit_grades_for_export,
+)
 from unicode.services.questions import scan_and_validate_questions_dir, sync_questions
 from unicode.services.students import (
     CsvFormatError,
@@ -269,6 +274,46 @@ def reset_cmd(
         raise typer.Exit(code=2) from exc
 
     typer.echo(format_reset_report(result))
+
+
+@app.command("export-notas")
+def export_notas_cmd(
+    unidade: Annotated[
+        str,
+        typer.Argument(help="Código da unidade (ex.: unit-01)."),
+    ],
+    turma: Annotated[
+        str | None,
+        typer.Option("--turma", "-t", help="Filtrar por código da turma."),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Arquivo de saída CSV (opcional)."),
+    ] = None,
+) -> None:
+    """Exporta as notas dos alunos em uma unidade no formato CSV."""
+    try:
+        with transaction() as conn:
+            rows = list_unit_grades_for_export(conn, unidade, class_group=turma)
+    except GradeReportError as exc:
+        typer.echo(f"Erro: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except Exception as exc:
+        typer.echo(f"Erro fatal de banco de dados: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    finally:
+        close_pool()
+
+    csv_text = format_grades_csv(rows)
+    if output is not None:
+        try:
+            output.write_text(csv_text, encoding="utf-8")
+        except Exception as exc:
+            typer.echo(f"Erro fatal ao gravar arquivo CSV: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+        typer.echo(f"Notas exportadas para {output} ({len(rows)} aluno(s)).")
+    else:
+        typer.echo(csv_text, nl=False)
 
 
 if __name__ == "__main__":
