@@ -48,3 +48,17 @@ claude.md
 superpowers/
 docs/superpowers/
 .superpowers/
+
+# Node / Frontend
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+.vite/
+*.tsbuildinfo
+.npm/
+
+# Student workspaces generated locally
+workspaces/*
+!workspaces/.gitkeep
+
