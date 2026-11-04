@@ -37,7 +37,7 @@ services:
       UNICODE_ADMIN_PASSWORD: ${UNICODE_ADMIN_PASSWORD:-troque_esta_senha_em_prod}
       UNICODE_WEB_DIST_DIR: /app/web/dist
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8080}:8000"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/overview || exit 0"]
       interval: 10s
