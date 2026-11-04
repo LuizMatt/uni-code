@@ -15,6 +15,8 @@ def test_web_package_and_typescript_structure_exists() -> None:
     expected_files = [
         "tsconfig.json",
         "vite.config.ts",
+        "tailwind.config.js",
+        "postcss.config.js",
         "index.html",
         "README.md",
         "src/main.tsx",

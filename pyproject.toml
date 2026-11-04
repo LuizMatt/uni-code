@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "unicode"
 version = "0.1.0"
 description = "LeetCode-style programming problems environment accessed via SSH"
-readme = "CLAUDE.md"
+readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.14.0",
