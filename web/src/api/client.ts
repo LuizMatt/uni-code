@@ -1,3 +1,10 @@
+import {
+  ImportCsvReport,
+  StudentCreateInput,
+  StudentMutationResponse,
+  StudentUpdateInput,
+} from "./types";
+
 const TOKEN_KEY = "unicode_admin_token";
 
 export function getStoredToken(): string | null {
@@ -80,3 +87,57 @@ export async function downloadGradesCsv(unitCode: string, classGroup?: string): 
   window.URL.revokeObjectURL(downloadUrl);
 }
 
+export async function createStudent(
+  payload: StudentCreateInput
+): Promise<StudentMutationResponse> {
+  return apiFetch<StudentMutationResponse>("/api/students", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateStudent(
+  registration: string,
+  payload: StudentUpdateInput
+): Promise<StudentMutationResponse> {
+  return apiFetch<StudentMutationResponse>(
+    `/api/students/${encodeURIComponent(registration)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function deleteStudent(
+  registration: string
+): Promise<{ deleted: boolean; registration: string }> {
+  return apiFetch<{ deleted: boolean; registration: string }>(
+    `/api/students/${encodeURIComponent(registration)}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+export async function deleteClassGroup(
+  classGroup: string
+): Promise<{ deleted: boolean; class_group: string; count: number }> {
+  return apiFetch<{ deleted: boolean; class_group: string; count: number }>(
+    `/api/students/classes/${encodeURIComponent(classGroup)}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+export async function uploadStudentsCsv(file: File): Promise<ImportCsvReport> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch<ImportCsvReport>("/api/students/import-csv", {
+    method: "POST",
+    body: formData,
+  });
+}
