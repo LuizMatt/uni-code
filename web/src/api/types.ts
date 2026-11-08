@@ -93,3 +93,38 @@ export interface UnitDetailReport {
   title: string;
   questions: QuestionRateStat[];
 }
+
+
+export interface StudentCreateInput {
+  registration: string;
+  email: string;
+  name?: string | null;
+  class_group?: string | null;
+}
+
+export interface StudentUpdateInput {
+  email: string;
+  name?: string | null;
+  class_group?: string | null;
+}
+
+export interface StudentMutationResponse {
+  registration: string;
+  email: string;
+  name: string | null;
+  class_group: string | null;
+}
+
+export interface ImportIssue {
+  line_number: number;
+  message: string;
+}
+
+export interface ImportCsvReport {
+  created: number;
+  updated: number;
+  unchanged: number;
+  has_errors: boolean;
+  errors: ImportIssue[];
+  warnings: ImportIssue[];
+}
