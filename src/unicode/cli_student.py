@@ -248,11 +248,13 @@ def run_local_public_examples(
 
             try:
                 proc = subprocess.run(
-                    [sys.executable, "-I", str(harness_path)],
+                    [sys.executable, "-X", "utf8", "-I", str(harness_path)],
                     cwd=str(tmp_dir),
                     env=env,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=timeout_seconds,
                     check=False,
                 )
@@ -274,6 +276,8 @@ def run_local_public_examples(
                 proc_py = subprocess.run(
                     [
                         sys.executable,
+                        "-X",
+                        "utf8",
                         "-I",
                         "-m",
                         "pytest",
@@ -286,6 +290,8 @@ def run_local_public_examples(
                     env=env,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=timeout_seconds,
                     check=False,
                 )
