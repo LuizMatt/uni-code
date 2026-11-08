@@ -39,9 +39,15 @@ from unicode.services.sessions import (
 )
 from unicode.services.students import (
     CsvFormatError,
+    StudentConflictError,
+    create_student,
+    delete_class_group,
+    delete_student,
     import_students,
+    import_students_from_csv_bytes,
     list_students,
     parse_students_csv,
+    update_student,
 )
 from unicode.services.submissions import (
     AssignmentAlreadyClosedError,
@@ -75,6 +81,7 @@ __all__ = [
     "QuestionTestNotFoundError",
     "SessionAuthError",
     "SessionError",
+    "StudentConflictError",
     "StudentNotFoundError",
     "SubmissionError",
     "UnitNotFoundError",
@@ -83,6 +90,9 @@ __all__ = [
     "authenticate_student_login",
     "cleanup_expired_sessions",
     "create_session",
+    "create_student",
+    "delete_class_group",
+    "delete_student",
     "draw_assignments",
     "ensure_student_workspace",
     "finalize_attempt",
@@ -93,6 +103,7 @@ __all__ = [
     "get_unit_detail_report",
     "hash_session_token",
     "import_students",
+    "import_students_from_csv_bytes",
     "list_active_assignments",
     "list_all_active_assignments",
     "list_attempts",
@@ -109,4 +120,5 @@ __all__ = [
     "scan_and_validate_questions_dir",
     "submit_solution",
     "sync_questions",
+    "update_student",
 ]

@@ -20,6 +20,14 @@ _REGISTRATION_RE = re.compile(r"^[0-9]+$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+class StudentConflictError(Exception):
+    """Raised when creating or updating a student causes a conflict with an existing record."""
+
+
+class StudentNotFoundError(Exception):
+    """Raised when a student registration is not found."""
+
+
 class CsvFormatError(Exception):
     """Raised when the CSV structure is fundamentally unparseable."""
 
@@ -324,3 +332,285 @@ def list_students(
         )
         for row in rows
     ]
+
+
+def create_student(
+    conn: DictConnection,
+    registration: str,
+    email: str,
+    name: str | None = None,
+    class_group: str | None = None,
+    *,
+    actor: str = "admin",
+) -> Student:
+    """Create a new student with transaction and audit logging.
+
+    Raises:
+        ValueError: If registration is empty or email format is invalid.
+        StudentConflictError: If registration or email already exists.
+    """
+    reg = registration.strip()
+    em = email.strip().lower()
+
+    if not reg:
+        raise ValueError("matrícula não pode ser vazia")
+    if not _EMAIL_RE.fullmatch(em):
+        raise ValueError("email inválido")
+
+    clean_name = name.strip() if name and name.strip() else None
+    clean_class = class_group.strip() if class_group and class_group.strip() else None
+
+    with conn.transaction():
+        existing_reg = conn.execute(
+            "SELECT registration FROM students WHERE registration = %s",
+            (reg,),
+        ).fetchone()
+        if existing_reg is not None:
+            raise StudentConflictError(f"matrícula '{reg}' já cadastrada")
+
+        existing_email = conn.execute(
+            "SELECT registration FROM students WHERE email = %s",
+            (em,),
+        ).fetchone()
+        if existing_email is not None:
+            raise StudentConflictError(f"email '{em}' já cadastrado")
+
+        try:
+            row = conn.execute(
+                "INSERT INTO students (registration, email, name, class_group) "
+                "VALUES (%s, %s, %s, %s) "
+                "RETURNING registration, email, name, class_group, created_at",
+                (reg, em, clean_name, clean_class),
+            ).fetchone()
+        except errors.UniqueViolation as exc:
+            raise StudentConflictError(f"conflito ao cadastrar aluno: {exc}") from exc
+
+        assert row is not None
+
+        audit_details = {
+            "registration": reg,
+            "email": em,
+            "name": clean_name,
+            "class_group": clean_class,
+        }
+        conn.execute(
+            "INSERT INTO audit_log (actor, action, details) VALUES (%s, %s, %s)",
+            (actor, "create_student", json.dumps(audit_details)),
+        )
+
+        return Student(
+            registration=row["registration"],
+            email=row["email"],
+            name=row["name"],
+            class_group=row["class_group"],
+            created_at=row["created_at"],
+        )
+
+
+def update_student(
+    conn: DictConnection,
+    registration: str,
+    email: str,
+    name: str | None = None,
+    class_group: str | None = None,
+    *,
+    actor: str = "admin",
+) -> Student:
+    """Update an existing student with conflict check and audit logging.
+
+    Raises:
+        ValueError: If registration is empty or email format is invalid.
+        StudentNotFoundError: If registration is not found.
+        StudentConflictError: If email is already in use by another student.
+    """
+    reg = registration.strip()
+    em = email.strip().lower()
+
+    if not reg:
+        raise ValueError("matrícula não pode ser vazia")
+    if not _EMAIL_RE.fullmatch(em):
+        raise ValueError("email inválido")
+
+    clean_name = name.strip() if name and name.strip() else None
+    clean_class = class_group.strip() if class_group and class_group.strip() else None
+
+    with conn.transaction():
+        existing = conn.execute(
+            "SELECT registration, email, name, class_group, created_at FROM students "
+            "WHERE registration = %s FOR UPDATE",
+            (reg,),
+        ).fetchone()
+        if existing is None:
+            raise StudentNotFoundError(f"aluno '{reg}' não encontrado")
+
+        conflict = conn.execute(
+            "SELECT registration FROM students WHERE email = %s AND registration <> %s",
+            (em, reg),
+        ).fetchone()
+        if conflict is not None:
+            raise StudentConflictError(
+                f"email '{em}' já pertence a outro aluno ({conflict['registration']})"
+            )
+
+        try:
+            row = conn.execute(
+                "UPDATE students SET email = %s, name = %s, class_group = %s "
+                "WHERE registration = %s "
+                "RETURNING registration, email, name, class_group, created_at",
+                (em, clean_name, clean_class, reg),
+            ).fetchone()
+        except errors.UniqueViolation as exc:
+            raise StudentConflictError(f"conflito ao atualizar aluno: {exc}") from exc
+
+        assert row is not None
+
+        audit_details = {
+            "registration": reg,
+            "email": em,
+            "name": clean_name,
+            "class_group": clean_class,
+            "previous": {
+                "email": existing["email"],
+                "name": existing["name"],
+                "class_group": existing["class_group"],
+            },
+        }
+        conn.execute(
+            "INSERT INTO audit_log (actor, action, details) VALUES (%s, %s, %s)",
+            (actor, "update_student", json.dumps(audit_details)),
+        )
+
+        return Student(
+            registration=row["registration"],
+            email=row["email"],
+            name=row["name"],
+            class_group=row["class_group"],
+            created_at=row["created_at"],
+        )
+
+
+def delete_student(
+    conn: DictConnection,
+    registration: str,
+    *,
+    actor: str = "admin",
+) -> bool:
+    """Delete a student and cascade to attempts, assignments, and sessions.
+
+    Raises:
+        StudentNotFoundError: If registration is not found.
+    """
+    reg = registration.strip()
+    if not reg:
+        raise StudentNotFoundError("matrícula não pode ser vazia")
+
+    with conn.transaction():
+        existing = conn.execute(
+            "SELECT registration, email, name, class_group FROM students "
+            "WHERE registration = %s FOR UPDATE",
+            (reg,),
+        ).fetchone()
+        if existing is None:
+            raise StudentNotFoundError(f"aluno '{reg}' não encontrado")
+
+        conn.execute(
+            "DELETE FROM attempts WHERE assignment_id IN ("
+            "SELECT id FROM assignments WHERE student_registration = %s"
+            ")",
+            (reg,),
+        )
+        conn.execute(
+            "DELETE FROM assignments WHERE student_registration = %s",
+            (reg,),
+        )
+        conn.execute(
+            "DELETE FROM sessions WHERE student_registration = %s",
+            (reg,),
+        )
+        conn.execute(
+            "DELETE FROM students WHERE registration = %s",
+            (reg,),
+        )
+
+        audit_details = {
+            "registration": reg,
+            "email": existing["email"],
+            "name": existing["name"],
+            "class_group": existing["class_group"],
+        }
+        conn.execute(
+            "INSERT INTO audit_log (actor, action, details) VALUES (%s, %s, %s)",
+            (actor, "delete_student", json.dumps(audit_details)),
+        )
+
+        return True
+
+
+def delete_class_group(
+    conn: DictConnection,
+    class_group: str,
+    *,
+    actor: str = "admin",
+) -> int:
+    """Delete all students in a class group with cascading delete and audit logging.
+
+    Returns the count of deleted students (0 if none found).
+    """
+    target_class = class_group.strip()
+    with conn.transaction():
+        rows = conn.execute(
+            "SELECT registration FROM students WHERE class_group = %s FOR UPDATE",
+            (target_class,),
+        ).fetchall()
+        if not rows:
+            return 0
+
+        regs = [r["registration"] for r in rows]
+
+        conn.execute(
+            "DELETE FROM attempts WHERE assignment_id IN ("
+            "SELECT id FROM assignments WHERE student_registration = ANY(%s)"
+            ")",
+            (regs,),
+        )
+        conn.execute(
+            "DELETE FROM assignments WHERE student_registration = ANY(%s)",
+            (regs,),
+        )
+        conn.execute(
+            "DELETE FROM sessions WHERE student_registration = ANY(%s)",
+            (regs,),
+        )
+        conn.execute(
+            "DELETE FROM students WHERE registration = ANY(%s)",
+            (regs,),
+        )
+
+        audit_details = {
+            "class_group": target_class,
+            "count": len(regs),
+            "registrations": regs,
+        }
+        conn.execute(
+            "INSERT INTO audit_log (actor, action, details) VALUES (%s, %s, %s)",
+            (actor, "delete_class_group", json.dumps(audit_details)),
+        )
+
+        return len(regs)
+
+
+def import_students_from_csv_bytes(
+    conn: DictConnection,
+    content: bytes,
+    filename: str,
+    *,
+    actor: str = "admin",
+) -> ImportReport:
+    """Decode CSV bytes as utf-8-sig, parse and import students into database."""
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise CsvFormatError(f"falha ao decodificar arquivo CSV: {exc}") from exc
+
+    parsed = parse_students_csv(text)
+    return import_students(conn, parsed, source=filename, actor=actor)
