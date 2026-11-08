@@ -133,7 +133,7 @@ def test_scan_duplicate_slug(tmp_path: Path) -> None:
 
 
 def test_repository_questions_catalog_has_five_valid_unit01_questions() -> None:
-    repo_questions = Path(__file__).resolve().parent.parent / "questions"
+    repo_questions = Path(__file__).resolve().parent.parent.parent / "questions"
     result = scan_and_validate_questions_dir(repo_questions)
     assert not result.has_errors
     unit01_questions = [q for q in result.questions if q.unit_code == "unit-01" and q.active]
