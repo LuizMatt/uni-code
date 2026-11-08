@@ -15,8 +15,19 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from unicode.config import Settings, get_settings
 from unicode.db import DictConnection, DictPool, create_pool, transaction
@@ -29,8 +40,31 @@ from unicode.services.grades import (
     list_student_grades_summary,
     list_unit_grades_for_export,
 )
+from unicode.services.students import (
+    CsvFormatError,
+    StudentConflictError,
+    StudentNotFoundError,
+    create_student,
+    delete_class_group,
+    delete_student,
+    import_students_from_csv_bytes,
+    update_student,
+)
 
 ConnFactory = Callable[[], AbstractContextManager[DictConnection]]
+
+
+class StudentCreateRequest(BaseModel):
+    registration: str
+    email: str
+    name: str | None = None
+    class_group: str | None = None
+
+
+class StudentUpdateRequest(BaseModel):
+    email: str
+    name: str | None = None
+    class_group: str | None = None
 
 
 def _verify_basic_auth(auth_header: str | None, settings: Settings) -> str:
@@ -149,6 +183,71 @@ def create_app(
             )
         return {"students": [asdict(s) for s in students]}
 
+    @app.post("/api/students", status_code=status.HTTP_201_CREATED)
+    def api_create_student(
+        admin_email: AdminDep,
+        payload: StudentCreateRequest,
+    ) -> dict[str, Any]:
+        try:
+            with active_conn_factory() as conn:
+                student = create_student(
+                    conn,
+                    payload.registration,
+                    payload.email,
+                    payload.name,
+                    payload.class_group,
+                    actor=admin_email,
+                )
+        except StudentConflictError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+            ) from None
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from None
+
+        return {
+            "registration": student.registration,
+            "email": student.email,
+            "name": student.name,
+            "class_group": student.class_group,
+        }
+
+    @app.post("/api/students/import-csv", status_code=status.HTTP_200_OK)
+    async def api_import_students_csv(
+        admin_email: AdminDep,
+        file: Annotated[UploadFile, File()],
+    ) -> dict[str, Any]:
+        content = await file.read()
+        try:
+            with active_conn_factory() as conn:
+                report = import_students_from_csv_bytes(
+                    conn,
+                    content,
+                    file.filename or "upload.csv",
+                    actor=admin_email,
+                )
+        except CsvFormatError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from None
+
+        return {
+            "created": report.created,
+            "updated": report.updated,
+            "unchanged": report.unchanged,
+            "has_errors": report.has_errors,
+            "errors": [
+                {"line_number": e.line_number, "message": e.message}
+                for e in report.errors
+            ],
+            "warnings": [
+                {"line_number": w.line_number, "message": w.message}
+                for w in report.warnings
+            ],
+        }
+
     @app.get("/api/students/{registration}")
     def api_student_detail(_admin: AdminDep, registration: str) -> dict[str, Any]:
         try:
@@ -159,6 +258,72 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
             ) from None
         return asdict(report)
+
+    @app.put("/api/students/{registration}", status_code=status.HTTP_200_OK)
+    def api_update_student(
+        admin_email: AdminDep,
+        registration: str,
+        payload: StudentUpdateRequest,
+    ) -> dict[str, Any]:
+        try:
+            with active_conn_factory() as conn:
+                student = update_student(
+                    conn,
+                    registration,
+                    payload.email,
+                    payload.name,
+                    payload.class_group,
+                    actor=admin_email,
+                )
+        except StudentNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from None
+        except StudentConflictError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+            ) from None
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from None
+
+        return {
+            "registration": student.registration,
+            "email": student.email,
+            "name": student.name,
+            "class_group": student.class_group,
+        }
+
+    @app.delete(
+        "/api/students/classes/{class_group}", status_code=status.HTTP_200_OK
+    )
+    def api_delete_class_group(
+        admin_email: AdminDep,
+        class_group: str,
+    ) -> dict[str, Any]:
+        with active_conn_factory() as conn:
+            count = delete_class_group(conn, class_group, actor=admin_email)
+        if count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Turma '{class_group}' não encontrada ou sem alunos.",
+            )
+        return {"deleted": True, "class_group": class_group, "count": count}
+
+    @app.delete("/api/students/{registration}", status_code=status.HTTP_200_OK)
+    def api_delete_student(
+        admin_email: AdminDep,
+        registration: str,
+    ) -> dict[str, Any]:
+        try:
+            with active_conn_factory() as conn:
+                delete_student(conn, registration, actor=admin_email)
+        except StudentNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from None
+        return {"deleted": True, "registration": registration}
 
     @app.get("/api/units/{code}")
     def api_unit_detail(_admin: AdminDep, code: str) -> dict[str, Any]:
