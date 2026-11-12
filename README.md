@@ -95,15 +95,28 @@ Aplique as migrações com o Alembic para criar tabelas, views e papéis de aces
 uv run alembic upgrade head
 ```
 
-### 5. Sincronizar as Questões no Banco
+### 5. Popular Dados Iniciais e Usuários de Teste (Seed)
 
-Importe o catálogo de unidades e questões da pasta `questions/` para o PostgreSQL:
+Para sincronizar o catálogo de questões e popular o banco com turmas, alunos e histórico de submissões simuladas (aprovados, reprovados e com tentativas esgotadas):
 
 ```bash
-uv run unicode-admin sync-questoes
+uv run python seed.py
 ```
 
-*(Opcional: Para importar uma lista de alunos a partir de um CSV, use `uv run unicode-admin import-alunos caminho/para/alunos.csv`)*.
+*(Opcional: Para importar manualmente outra lista de alunos via CSV, você também pode usar `uv run unicode-admin import-alunos alunos_teste.csv`)*.
+
+---
+
+## 👥 Usuários e Credenciais de Teste
+
+| Perfil | Identificador / E-mail | Senha / Acesso | Situação Inicial |
+| :--- | :--- | :--- | :--- |
+| **Professor / Admin** | `admin@unicode.local` | `change-me-in-prod` | Administrador geral; acesso total ao painel web, turmas, métricas e exportação de CSV |
+| **Aluno** | `202601001` (Lucas Silva) | Sessão / SSH | TURMA-A · Unidade 1 iniciada · 1 questão aprovada (0,5 ponto) |
+| **Aluna** | `202601002` (Beatriz Mendes) | Sessão / SSH | TURMA-A · Unidade 1 iniciada · 2 tentativas gastas com falhas (1 restante) |
+| **Aluno** | `202601003` (Rodrigo Souza) | Sessão / SSH | TURMA-A · Unidade 1 iniciada · 3 tentativas esgotadas (0,0 pontos) |
+| **Aluna** | `202601004` (Camila Rocha) | Sessão / SSH | TURMA-B · Cadastrada · Nenhuma avaliação iniciada |
+| **Aluno** | `202601099` (Marcos Lima) | Bloqueado | TURMA-B · Matrícula trancada (conta inativa) |
 
 ---
 
