@@ -1,0 +1,38 @@
+{
+  "success": {
+    "defaultTitle": "Sucesso",
+    "icon": "mdi-check-circle-outline",
+    "duration": 4000,
+    "containerClass": "bg-slate-900/95 border-emerald-700/80 text-slate-200",
+    "iconClass": "bg-emerald-950/80 text-emerald-400 border border-emerald-800/80",
+    "titleClass": "text-emerald-400",
+    "progressClass": "bg-emerald-500"
+  },
+  "error": {
+    "defaultTitle": "Erro",
+    "icon": "mdi-alert-circle-outline",
+    "duration": 5000,
+    "containerClass": "bg-slate-900/95 border-rose-700/80 text-slate-200",
+    "iconClass": "bg-rose-950/80 text-rose-400 border border-rose-800/80",
+    "titleClass": "text-rose-400",
+    "progressClass": "bg-rose-500"
+  },
+  "warning": {
+    "defaultTitle": "Atenção",
+    "icon": "mdi-alert-outline",
+    "duration": 4500,
+    "containerClass": "bg-slate-900/95 border-amber-700/80 text-slate-200",
+    "iconClass": "bg-amber-950/80 text-amber-400 border border-amber-800/80",
+    "titleClass": "text-amber-400",
+    "progressClass": "bg-amber-500"
+  },
+  "info": {
+    "defaultTitle": "Informação",
+    "icon": "mdi-information-outline",
+    "duration": 4000,
+    "containerClass": "bg-slate-900/95 border-sky-700/80 text-slate-200",
+    "iconClass": "bg-sky-950/80 text-sky-400 border border-sky-800/80",
+    "titleClass": "text-sky-400",
+    "progressClass": "bg-sky-500"
+  }
+}
