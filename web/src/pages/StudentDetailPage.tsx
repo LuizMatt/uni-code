@@ -2,30 +2,34 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { StudentDetailReport, AttemptDetail } from "../api/types";
-import { StatusBadge } from "../components/StatusBadge";
-import { CodeModal } from "../components/CodeModal";
+import { useToast } from "../context/ToastContext";
+import { Button } from "../components/atoms/Button";
+import { StatusBadge } from "../components/atoms/StatusBadge";
+import { CodeModal } from "../components/organisms/CodeModal";
 
 export const StudentDetailPage: React.FC = () => {
   const { matricula } = useParams<{ matricula: string }>();
   const [data, setData] = useState<StudentDetailReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<AttemptDetail | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (!matricula) return;
     apiFetch<StudentDetailReport>(`/api/students/${matricula}`)
       .then(setData)
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Erro ao carregar histórico do aluno.");
+      })
       .finally(() => setLoading(false));
-  }, [matricula]);
+  }, [matricula, toast]);
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400 text-sm">Carregando histórico do aluno...</div>;
   }
 
-  if (error || !data) {
-    return <div className="text-center py-12 text-rose-400 text-sm">Erro: {error}</div>;
+  if (!data) {
+    return <div className="text-center py-12 text-slate-400 text-sm">Não foi possível carregar o histórico do aluno.</div>;
   }
 
   const { student, grades_by_unit, total_points, assignments } = data;
@@ -129,12 +133,15 @@ export const StudentDetailPage: React.FC = () => {
                             )}
                           </div>
 
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            fullWidth
+                            icon="mdi-code-tags"
                             onClick={() => setSelectedAttempt(att)}
-                            className="w-full text-xs text-center py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded transition"
                           >
                             Inspecionar Código
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -150,4 +157,3 @@ export const StudentDetailPage: React.FC = () => {
     </div>
   );
 };
-

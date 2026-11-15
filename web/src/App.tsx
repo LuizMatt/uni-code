@@ -1,7 +1,8 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { Layout } from "./components/Layout";
+import { ToastProvider } from "./context/ToastContext";
+import { Layout } from "./components/templates/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { StudentsPage } from "./pages/StudentsPage";
@@ -18,48 +19,49 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
 
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <OverviewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/alunos"
-            element={
-              <ProtectedRoute>
-                <StudentsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/alunos/:matricula"
-            element={
-              <ProtectedRoute>
-                <StudentDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/unidades/:codigo"
-            element={
-              <ProtectedRoute>
-                <UnitDetailPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <OverviewPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/alunos"
+              element={
+                <ProtectedRoute>
+                  <StudentsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/alunos/:matricula"
+              element={
+                <ProtectedRoute>
+                  <StudentDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/unidades/:codigo"
+              element={
+                <ProtectedRoute>
+                  <UnitDetailPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
   );
 };
-
