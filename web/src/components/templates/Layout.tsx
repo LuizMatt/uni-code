@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
+import { Button } from "../atoms/Button";
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { adminEmail, logout } = useAuth();
@@ -42,12 +43,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
           <div className="flex items-center space-x-4">
             <span className="text-xs text-slate-400 font-mono hidden sm:inline">{adminEmail}</span>
-            <button
+            <Button
+              variant="danger-soft"
+              size="sm"
+              icon="mdi-logout"
               onClick={logout}
-              className="text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-950/40 hover:bg-rose-900/40 border border-rose-800/50 px-3 py-1.5 rounded-lg transition"
             >
               Sair
-            </button>
+            </Button>
           </div>
         </div>
       </header>
@@ -56,4 +59,3 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     </div>
   );
 };
-

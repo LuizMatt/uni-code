@@ -1,6 +1,7 @@
 import React from "react";
-import { AttemptDetail } from "../api/types";
-import { StatusBadge } from "./StatusBadge";
+import { AttemptDetail } from "../../api/types";
+import { StatusBadge } from "../atoms/StatusBadge";
+import { Button } from "../atoms/Button";
 
 interface CodeModalProps {
   attempt: AttemptDetail | null;
@@ -25,12 +26,9 @@ export const CodeModal: React.FC<CodeModalProps> = ({ attempt, onClose }) => {
                 : "Sem testes"}
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white px-2 py-1 rounded text-sm bg-slate-700/50 hover:bg-slate-700"
-          >
-            ✕ Fechar
-          </button>
+          <Button variant="ghost" size="xs" icon="mdi-close" onClick={onClose}>
+            Fechar
+          </Button>
         </div>
 
         <div className="p-4 overflow-y-auto space-y-4 flex-1">
@@ -58,4 +56,3 @@ export const CodeModal: React.FC<CodeModalProps> = ({ attempt, onClose }) => {
     </div>
   );
 };
-

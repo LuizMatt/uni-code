@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { StudentGradesSummary } from "../api/types";
-import { createStudent, updateStudent } from "../api/client";
+import { StudentGradesSummary } from "../../api/types";
+import { createStudent, updateStudent } from "../../api/client";
+import { useToast } from "../../context/ToastContext";
+import { Button } from "../atoms/Button";
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -22,7 +24,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
   const [email, setEmail] = useState("");
   const [classGroup, setClassGroup] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (isOpen) {
@@ -37,7 +39,6 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         setEmail("");
         setClassGroup("");
       }
-      setError(null);
     }
   }, [isOpen, mode, student]);
 
@@ -47,17 +48,17 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     e.preventDefault();
 
     if (mode === "create" && !registration.trim()) {
-      setError("A matrícula é obrigatória.");
+      toast.error("A matrícula é obrigatória.");
       return;
     }
 
     if (!email.trim()) {
-      setError("O email é obrigatório.");
+      toast.error("O email é obrigatório.");
       return;
     }
 
+    if (mode !== "create" && !student) return;
     setLoading(true);
-    setError(null);
 
     try {
       if (mode === "create") {
@@ -67,21 +68,22 @@ export const StudentModal: React.FC<StudentModalProps> = ({
           name: name.trim() || null,
           class_group: classGroup.trim() || null,
         });
-      } else {
-        if (!student) return;
+        toast.success("Aluno criado com sucesso!");
+      } else if (student) {
         await updateStudent(student.registration, {
           email: email.trim(),
           name: name.trim() || null,
           class_group: classGroup.trim() || null,
         });
+        toast.success("Dados do aluno atualizados com sucesso!");
       }
       onSuccess();
       onClose();
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Erro ao salvar aluno.");
+        toast.error("Erro ao salvar aluno.");
       }
     } finally {
       setLoading(false);
@@ -95,22 +97,12 @@ export const StudentModal: React.FC<StudentModalProps> = ({
           <h3 className="text-lg font-semibold text-white">
             {mode === "create" ? "Novo Aluno" : "Editar Aluno"}
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-white px-2 py-1 rounded text-sm bg-slate-700/50 hover:bg-slate-700 transition"
-          >
-            ✕ Fechar
-          </button>
+          <Button variant="ghost" size="xs" icon="mdi-close" onClick={onClose} disabled={loading}>
+            Fechar
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {error && (
-            <div className="bg-rose-950/50 border border-rose-800/80 rounded-lg p-3 text-rose-300 text-xs leading-relaxed">
-              {error}
-            </div>
-          )}
-
           <div>
             <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
               Matrícula <span className="text-rose-400">*</span>
@@ -175,30 +167,24 @@ export const StudentModal: React.FC<StudentModalProps> = ({
           </div>
 
           <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-700/60">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               onClick={onClose}
               disabled={loading}
-              className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={loading}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+              variant="primary"
+              size="md"
+              icon="mdi-check"
+              loading={loading}
+              loadingText="Salvando..."
             >
-              {loading ? (
-                <>
-                  <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Salvando...</span>
-                </>
-              ) : mode === "create" ? (
-                "Criar Aluno"
-              ) : (
-                "Salvar Aluno"
-              )}
-            </button>
+              {mode === "create" ? "Criar Aluno" : "Salvar Aluno"}
+            </Button>
           </div>
         </form>
       </div>

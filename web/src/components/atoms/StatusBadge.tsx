@@ -1,5 +1,5 @@
 import React from "react";
-import { AssignmentState, AttemptStatus } from "../api/types";
+import { AssignmentState, AttemptStatus } from "../../api/types";
 
 export const StatusBadge: React.FC<{ status: AssignmentState | AttemptStatus }> = ({ status }) => {
   const map: Record<string, { label: string; className: string }> = {

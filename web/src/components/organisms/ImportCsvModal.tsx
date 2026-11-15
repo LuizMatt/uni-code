@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ImportCsvReport } from "../api/types";
-import { uploadStudentsCsv } from "../api/client";
+import { ImportCsvReport } from "../../api/types";
+import { uploadStudentsCsv } from "../../api/client";
+import { useToast } from "../../context/ToastContext";
+import { Button } from "../atoms/Button";
 
 interface ImportCsvModalProps {
   isOpen: boolean;
@@ -15,14 +17,13 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ImportCsvReport | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (isOpen) {
       setFile(null);
-      setError(null);
       setReport(null);
       setLoading(false);
       if (fileInputRef.current) {
@@ -37,34 +38,37 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
     const selected = e.target.files?.[0];
     if (selected) {
       if (!selected.name.toLowerCase().endsWith(".csv")) {
-        setError("Por favor, selecione um arquivo no formato .csv");
+        toast.warning("Por favor, selecione um arquivo no formato .csv");
         setFile(null);
         return;
       }
       setFile(selected);
-      setError(null);
       setReport(null);
     }
   };
 
   const handleUpload = async () => {
     if (!file) {
-      setError("Selecione um arquivo CSV para continuar.");
+      toast.warning("Selecione um arquivo CSV para continuar.");
       return;
     }
 
     setLoading(true);
-    setError(null);
 
     try {
       const res = await uploadStudentsCsv(file);
       setReport(res);
       onSuccess();
+      if (res.errors.length > 0 || res.warnings.length > 0) {
+        toast.warning("Importação concluída com observações. Confira os detalhes no relatório.");
+      } else {
+        toast.success("Arquivo CSV importado com sucesso!");
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Falha ao importar o arquivo CSV.");
+        toast.error("Falha ao importar o arquivo CSV.");
       }
     } finally {
       setLoading(false);
@@ -74,7 +78,6 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
   const resetForNewUpload = () => {
     setFile(null);
     setReport(null);
-    setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -87,22 +90,12 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
           <div className="flex items-center space-x-2">
             <h3 className="text-lg font-semibold text-white">Importar Alunos via CSV</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-white px-2 py-1 rounded text-sm bg-slate-700/50 hover:bg-slate-700 transition"
-          >
-            ✕ Fechar
-          </button>
+          <Button variant="ghost" size="xs" icon="mdi-close" onClick={onClose} disabled={loading}>
+            Fechar
+          </Button>
         </div>
 
         <div className="p-5 overflow-y-auto space-y-4 flex-1">
-          {error && (
-            <div className="bg-rose-950/50 border border-rose-800/80 rounded-lg p-3 text-rose-300 text-xs leading-relaxed">
-              {error}
-            </div>
-          )}
-
           {!report ? (
             <div className="space-y-4">
               <div className="text-xs text-slate-300 space-y-2 bg-slate-900/60 p-3.5 rounded-lg border border-slate-800">
@@ -131,7 +124,10 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
 
               {file && (
                 <div className="flex items-center justify-between text-xs bg-slate-900/70 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-300 font-mono">
-                  <span>📄 {file.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    <i className="mdi mdi-file-delimited-outline text-emerald-400 text-sm" aria-hidden="true" />
+                    {file.name}
+                  </span>
                   <span className="text-slate-400">{(file.size / 1024).toFixed(1)} KB</span>
                 </div>
               )}
@@ -140,7 +136,8 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
             <div className="space-y-4">
               <div className="bg-emerald-950/40 border border-emerald-700/60 rounded-xl p-4">
                 <h4 className="text-emerald-400 font-semibold text-sm mb-3 flex items-center gap-2">
-                  <span>✓</span> Importação Concluída
+                  <i className="mdi mdi-check-circle-outline text-base" aria-hidden="true" />
+                  <span>Importação Concluída</span>
                 </h4>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="bg-slate-900/70 rounded-lg p-2.5 border border-emerald-900/50">
@@ -161,7 +158,8 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
               {report.errors.length > 0 && (
                 <div className="space-y-1.5">
                   <h5 className="text-xs font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>⚠</span> Erros ({report.errors.length})
+                    <i className="mdi mdi-alert-circle-outline text-sm" aria-hidden="true" />
+                    <span>Erros ({report.errors.length})</span>
                   </h5>
                   <div className="bg-rose-950/30 border border-rose-900/60 rounded-lg p-3 text-xs text-rose-300 max-h-36 overflow-y-auto space-y-1 font-mono">
                     {report.errors.map((err, idx) => (
@@ -179,7 +177,8 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
               {report.warnings.length > 0 && (
                 <div className="space-y-1.5">
                   <h5 className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>ℹ</span> Avisos ({report.warnings.length})
+                    <i className="mdi mdi-alert-outline text-sm" aria-hidden="true" />
+                    <span>Avisos ({report.warnings.length})</span>
                   </h5>
                   <div className="bg-amber-950/30 border border-amber-900/60 rounded-lg p-3 text-xs text-amber-300 max-h-36 overflow-y-auto space-y-1 font-mono">
                     {report.warnings.map((warn, idx) => (
@@ -200,46 +199,44 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
         <div className="flex items-center justify-between p-4 border-t border-slate-700/60 bg-slate-800/80">
           {report ? (
             <>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="mdi-refresh"
                 onClick={resetForNewUpload}
-                className="text-xs text-slate-300 hover:text-white underline underline-offset-4"
               >
                 Importar outro arquivo
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                icon="mdi-check"
                 onClick={onClose}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition"
               >
                 Concluir
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={onClose}
                 disabled={loading}
-                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition"
               >
                 Cancelar
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                icon="mdi-upload"
                 onClick={handleUpload}
-                disabled={!file || loading}
-                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+                disabled={!file}
+                loading={loading}
+                loadingText="Enviando e Importando..."
               >
-                {loading ? (
-                  <>
-                    <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Enviando e Importando...</span>
-                  </>
-                ) : (
-                  "Enviar e Importar"
-                )}
-              </button>
+                Enviar e Importar
+              </Button>
             </>
           )}
         </div>
