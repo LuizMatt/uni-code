@@ -2,25 +2,39 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch, downloadGradesCsv } from "../api/client";
 import { OverviewResponse } from "../api/types";
+import { useToast } from "../context/ToastContext";
+import { Button } from "../components/atoms/Button";
 
 export const OverviewPage: React.FC = () => {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     apiFetch<OverviewResponse>("/api/overview")
       .then(setData)
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : "Erro ao carregar visão geral.";
+        toast.error(msg);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
+
+  const handleExportCsv = async (unitCode: string) => {
+    try {
+      await downloadGradesCsv(unitCode);
+      toast.success(`Notas da unidade ${unitCode} exportadas com sucesso!`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Falha ao exportar CSV.");
+    }
+  };
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400 text-sm">Carregando métricas...</div>;
   }
 
-  if (error || !data) {
-    return <div className="text-center py-12 text-rose-400 text-sm">Erro ao carregar dados: {error}</div>;
+  if (!data) {
+    return <div className="text-center py-12 text-slate-400 text-sm">Não foi possível carregar os dados da visão geral.</div>;
   }
 
   const { stats, units } = data;
@@ -78,18 +92,22 @@ export const OverviewPage: React.FC = () => {
                   <td className="px-4 py-3 text-center">{u.students_started}</td>
                   <td className="px-4 py-3 text-center font-mono">{u.average_points}</td>
                   <td className="px-4 py-3 text-right space-x-2">
-                    <Link
+                    <Button
                       to={`/unidades/${u.code}`}
-                      className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded"
+                      variant="secondary"
+                      size="xs"
+                      icon="mdi-eye-outline"
                     >
                       Detalhes
-                    </Link>
-                    <button
-                      onClick={() => downloadGradesCsv(u.code)}
-                      className="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800 px-2.5 py-1 rounded transition"
+                    </Button>
+                    <Button
+                      variant="outline-emerald"
+                      size="xs"
+                      icon="mdi-download"
+                      onClick={() => handleExportCsv(u.code)}
                     >
                       Exportar CSV
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -100,4 +118,3 @@ export const OverviewPage: React.FC = () => {
     </div>
   );
 };
-

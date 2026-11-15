@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch, deleteClassGroup, deleteStudent } from "../api/client";
 import { StudentGradesSummary, StudentsResponse } from "../api/types";
-import { StudentModal } from "../components/StudentModal";
-import { ImportCsvModal } from "../components/ImportCsvModal";
-import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
+import { useToast } from "../context/ToastContext";
+import { Button } from "../components/atoms/Button";
+import { StudentModal } from "../components/organisms/StudentModal";
+import { ImportCsvModal } from "../components/organisms/ImportCsvModal";
+import { ConfirmDeleteModal } from "../components/organisms/ConfirmDeleteModal";
 
 type DeleteTarget =
   | { type: "student"; student: StudentGradesSummary }
@@ -16,7 +18,7 @@ export const StudentsPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -24,28 +26,25 @@ export const StudentsPage: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadStudents = useCallback(async () => {
     try {
       const res = await apiFetch<StudentsResponse>("/api/students");
       setStudents(res.students);
-      setError(null);
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Erro ao carregar alunos.");
+        toast.error("Erro ao carregar alunos.");
       }
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadStudents().finally(() => setLoading(false));
   }, [loadStudents]);
 
   const handleOpenDelete = (target: DeleteTarget) => {
-    setDeleteError(null);
     setDeleteTarget(target);
   };
 
@@ -53,22 +52,23 @@ export const StudentsPage: React.FC = () => {
     if (!deleteTarget) return;
 
     setDeleteLoading(true);
-    setDeleteError(null);
 
     try {
       if (deleteTarget.type === "student") {
         await deleteStudent(deleteTarget.student.registration);
+        toast.success(`Aluno ${deleteTarget.student.registration} excluído com sucesso!`);
       } else {
         await deleteClassGroup(deleteTarget.classGroup);
+        toast.success(`Turma ${deleteTarget.classGroup} apagada com sucesso!`);
         setSelectedGroup("ALL");
       }
       setDeleteTarget(null);
       await loadStudents();
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setDeleteError(err.message);
+        toast.error(err.message);
       } else {
-        setDeleteError("Erro ao excluir.");
+        toast.error("Erro ao realizar a exclusão.");
       }
     } finally {
       setDeleteLoading(false);
@@ -77,10 +77,6 @@ export const StudentsPage: React.FC = () => {
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400 text-sm">Carregando alunos...</div>;
-  }
-
-  if (error) {
-    return <div className="text-center py-12 text-rose-400 text-sm">Erro: {error}</div>;
   }
 
   // Extract unique classes
@@ -134,30 +130,33 @@ export const StudentsPage: React.FC = () => {
           </select>
 
           {selectedGroup !== "ALL" && (
-            <button
-              type="button"
+            <Button
+              variant="danger"
+              size="sm"
+              icon="mdi-delete-sweep-outline"
               onClick={() => handleOpenDelete({ type: "class", classGroup: selectedGroup })}
-              className="bg-rose-600/80 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs transition"
             >
               Apagar Turma {selectedGroup}
-            </button>
+            </Button>
           )}
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="mdi-file-upload-outline"
             onClick={() => setIsImportOpen(true)}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition"
           >
-            <span>Importar CSV</span>
-          </button>
+            Importar CSV
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
+            icon="mdi-account-plus-outline"
             onClick={() => setIsCreateOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition"
           >
-            <span>+ Novo Aluno</span>
-          </button>
+            Novo Aluno
+          </Button>
         </div>
       </div>
 
@@ -211,26 +210,30 @@ export const StudentsPage: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end space-x-1.5">
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        icon="mdi-pencil-outline"
                         onClick={() => setEditingStudent(s)}
-                        className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded text-xs transition"
                       >
                         Editar
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="danger-soft"
+                        size="xs"
+                        icon="mdi-delete-outline"
                         onClick={() => handleOpenDelete({ type: "student", student: s })}
-                        className="bg-rose-900/40 hover:bg-rose-700 text-rose-300 hover:text-white px-2.5 py-1 rounded text-xs transition"
                       >
                         Excluir
-                      </button>
-                      <Link
+                      </Button>
+                      <Button
                         to={`/alunos/${s.registration}`}
-                        className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded transition"
+                        variant="secondary"
+                        size="xs"
+                        icon="mdi-history"
                       >
                         Histórico
-                      </Link>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -289,7 +292,6 @@ export const StudentsPage: React.FC = () => {
             : "Excluir"
         }
         loading={deleteLoading}
-        error={deleteError}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
       />

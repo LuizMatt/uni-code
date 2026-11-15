@@ -1,27 +1,29 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { Button } from "../components/atoms/Button";
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       await login(email, password);
+      toast.success("Bem-vindo ao Painel do Professor!");
       navigate("/");
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Erro ao autenticar.");
+        toast.error("Erro ao autenticar.");
       }
     } finally {
       setLoading(false);
@@ -38,12 +40,6 @@ export const LoginPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-white tracking-tight">Painel do Professor</h1>
           <p className="text-xs text-slate-400 mt-1">UniCode — Acesso Administrativo</p>
         </div>
-
-        {error && (
-          <div className="mb-6 p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs">
-            {error}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -70,16 +66,20 @@ export const LoginPage: React.FC = () => {
             />
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition disabled:opacity-50 mt-2"
+            variant="primary"
+            size="md"
+            fullWidth
+            icon="mdi-login"
+            loading={loading}
+            loadingText="Entrando..."
+            className="mt-2"
           >
-            {loading ? "Entrando..." : "Entrar no Painel"}
-          </button>
+            Entrar no Painel
+          </Button>
         </form>
       </div>
     </div>
   );
 };
-

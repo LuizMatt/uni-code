@@ -2,27 +2,40 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiFetch, downloadGradesCsv } from "../api/client";
 import { UnitDetailReport } from "../api/types";
+import { useToast } from "../context/ToastContext";
+import { Button } from "../components/atoms/Button";
 
 export const UnitDetailPage: React.FC = () => {
   const { codigo } = useParams<{ codigo: string }>();
   const [data, setData] = useState<UnitDetailReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (!codigo) return;
     apiFetch<UnitDetailReport>(`/api/units/${codigo}`)
       .then(setData)
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Erro ao carregar unidade.");
+      })
       .finally(() => setLoading(false));
-  }, [codigo]);
+  }, [codigo, toast]);
+
+  const handleExportCsv = async (unitCode: string) => {
+    try {
+      await downloadGradesCsv(unitCode);
+      toast.success(`Notas da unidade ${unitCode} exportadas com sucesso!`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Falha ao exportar CSV.");
+    }
+  };
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400 text-sm">Carregando métricas da unidade...</div>;
   }
 
-  if (error || !data) {
-    return <div className="text-center py-12 text-rose-400 text-sm">Erro: {error}</div>;
+  if (!data) {
+    return <div className="text-center py-12 text-slate-400 text-sm">Não foi possível carregar os dados da unidade.</div>;
   }
 
   const { code, title, questions } = data;
@@ -44,12 +57,15 @@ export const UnitDetailPage: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1">Estatísticas de sorteio, taxa de acerto e tentativas por questão.</p>
         </div>
 
-        <button
-          onClick={() => downloadGradesCsv(code)}
-          className="self-start sm:self-auto text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800 px-3 py-2 rounded-lg font-medium transition"
+        <Button
+          variant="outline-emerald"
+          size="sm"
+          icon="mdi-download"
+          onClick={() => handleExportCsv(code)}
+          className="self-start sm:self-auto"
         >
           Exportar Notas da Unidade (.CSV)
-        </button>
+        </Button>
       </div>
 
       <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl overflow-hidden">
@@ -108,4 +124,3 @@ export const UnitDetailPage: React.FC = () => {
     </div>
   );
 };
-
