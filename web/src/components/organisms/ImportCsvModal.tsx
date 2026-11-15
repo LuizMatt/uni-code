@@ -3,6 +3,7 @@ import { ImportCsvReport } from "../../api/types";
 import { uploadStudentsCsv } from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Button } from "../atoms/Button";
+import { Modal } from "../molecules/Modal";
 
 interface ImportCsvModalProps {
   isOpen: boolean;
@@ -84,9 +85,14 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      disabled={loading}
+      maxWidthClass="max-w-xl"
+      className="max-h-[90vh]"
+    >
+      <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <div className="flex items-center space-x-2">
             <h3 className="text-lg font-semibold text-white">Importar Alunos via CSV</h3>
           </div>
@@ -240,7 +246,6 @@ export const ImportCsvModal: React.FC<ImportCsvModalProps> = ({
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
