@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "../atoms/Button";
+import { Modal } from "../molecules/Modal";
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -20,12 +21,9 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   onClose,
   onConfirm,
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+    <Modal isOpen={isOpen} onClose={onClose} disabled={loading} maxWidthClass="max-w-md">
+      <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <div className="flex items-center space-x-2.5">
             <i className="mdi mdi-alert-outline text-rose-500 text-lg leading-none" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-white">{title}</h3>
@@ -72,7 +70,6 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
             {confirmText}
           </Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

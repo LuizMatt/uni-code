@@ -3,6 +3,7 @@ import { StudentGradesSummary } from "../../api/types";
 import { createStudent, updateStudent } from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Button } from "../atoms/Button";
+import { Modal } from "../molecules/Modal";
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -91,9 +92,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+    <Modal isOpen={isOpen} onClose={onClose} disabled={loading} maxWidthClass="max-w-md">
+      <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <h3 className="text-lg font-semibold text-white">
             {mode === "create" ? "Novo Aluno" : "Editar Aluno"}
           </h3>
@@ -187,7 +187,6 @@ export const StudentModal: React.FC<StudentModalProps> = ({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };

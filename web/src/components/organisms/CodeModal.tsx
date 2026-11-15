@@ -2,6 +2,7 @@ import React from "react";
 import { AttemptDetail } from "../../api/types";
 import { StatusBadge } from "../atoms/StatusBadge";
 import { Button } from "../atoms/Button";
+import { Modal } from "../molecules/Modal";
 
 interface CodeModalProps {
   attempt: AttemptDetail | null;
@@ -9,12 +10,16 @@ interface CodeModalProps {
 }
 
 export const CodeModal: React.FC<CodeModalProps> = ({ attempt, onClose }) => {
-  if (!attempt) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+    <Modal
+      isOpen={Boolean(attempt)}
+      onClose={onClose}
+      maxWidthClass="max-w-4xl"
+      className="max-h-[90vh]"
+    >
+      {attempt && (
+        <>
+          <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <div className="flex items-center space-x-3">
             <h3 className="text-lg font-semibold text-white">
               Tentativa #{attempt.number}
@@ -52,7 +57,8 @@ export const CodeModal: React.FC<CodeModalProps> = ({ attempt, onClose }) => {
             </div>
           )}
         </div>
-      </div>
-    </div>
+        </>
+      )}
+    </Modal>
   );
 };
